@@ -1,5 +1,8 @@
 #!/usr/bin/env python
 
+# ME7785 Robotics Research
+# Hendrik Carius, Daniel Terrell
+
 import numpy as np
 import cv2
 
