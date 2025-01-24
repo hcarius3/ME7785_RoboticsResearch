@@ -30,12 +30,22 @@ while True:
     # Find contours in the mask
     contours, _ = cv2.findContours(mask, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
 
-    # Draw contours around detected green areas
+    # Draw contours around detected green areas and find their centers
     for contour in contours:
         # Optional: Filter small contours based on area
         if cv2.contourArea(contour) > 500:
             x, y, w, h = cv2.boundingRect(contour)
             cv2.rectangle(frame, (x, y), (x + w, y + h), (0, 255, 0), 2)
+
+            # Calculate the center of the bounding box
+            center_x = x + w // 2
+            center_y = y + h // 2
+
+            # Print the center coordinates
+            print(f"Center of object: ({center_x}, {center_y})")
+
+            # Optionally, draw the center point on the frame
+            cv2.circle(frame, (center_x, center_y), 5, (0, 0, 255), -1)
 
     # Display the original frame with contours
     cv2.imshow('Original Frame with Green Tracking', frame)
