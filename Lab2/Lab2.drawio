@@ -10,7 +10,7 @@
         <mxCell id="07V669nHP71Aa5sQzjpy-14" value="&lt;span style=&quot;color: rgba(0, 0, 0, 0); font-family: monospace; font-size: 0px; text-align: start;&quot;&gt;%3CmxGraphModel%3E%3Croot%3E%3CmxCell%20id%3D%220%22%2F%3E%3CmxCell%20id%3D%221%22%20parent%3D%220%22%2F%3E%3CmxCell%20id%3D%222%22%20value%3D%22Message%20Type%3A%20CompressedImage%26lt%3Bdiv%26gt%3BTopic%20Name%3A%2Ffind_object%2Fcompressed%26lt%3B%2Fdiv%26gt%3B%22%20style%3D%22text%3Bhtml%3D1%3Balign%3Dcenter%3BverticalAlign%3Dmiddle%3Bresizable%3D0%3Bpoints%3D%5B%5D%3Bautosize%3D1%3BstrokeColor%3Dnone%3BfillColor%3Dnone%3B%22%20vertex%3D%221%22%20parent%3D%221%22%3E%3CmxGeometry%20x%3D%22580%22%20y%3D%2273%22%20width%3D%22220%22%20height%3D%2240%22%20as%3D%22geometry%22%2F%3E%3C%2FmxCell%3E%3C%2Froot%3E%3C%2FmxGraphModel%3E&lt;/span&gt;" style="text;html=1;align=center;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;" parent="1" vertex="1">
           <mxGeometry x="550" y="8" width="20" height="30" as="geometry" />
         </mxCell>
-        <mxCell id="4XJyecxcwh25HMB2fOaj-1" value="User&#39;s Laptop Computer" style="swimlane;startSize=30;horizontal=1;containerType=tree;fontSize=14;fillColor=#dae8fc;strokeColor=#6c8ebf;" parent="1" vertex="1">
+        <mxCell id="4XJyecxcwh25HMB2fOaj-1" value="User&#39;s Laptop Computer" style="swimlane;startSize=40;horizontal=1;containerType=tree;fontSize=14;fillColor=#dae8fc;strokeColor=#6c8ebf;" parent="1" vertex="1">
           <mxGeometry y="160" width="240" height="200" as="geometry">
             <mxRectangle x="470" y="400" width="120" height="30" as="alternateBounds" />
           </mxGeometry>
