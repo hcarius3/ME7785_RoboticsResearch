@@ -55,7 +55,7 @@ class FindObject(Node):
 
         _, compressed_img = cv2.imencode('.jpg', frame)
         image_msg = CompressedImage()
-        image_msg.format = "jpeg"
+        image_msg.format = "jpg"
         image_msg.data = np.array(compressed_img).tobytes()
 
         self.image_pub.publish(image_msg)
