@@ -1,0 +1,8 @@
+# Package for Lab3
+masteroogway_chase_object
+
+# Bringup robot
+ros2 launch turtlebot3_bringup camera_robot.launch.py
+
+# Launch our package
+ros2 launch masteroogway_chase_object chase.launch.py
