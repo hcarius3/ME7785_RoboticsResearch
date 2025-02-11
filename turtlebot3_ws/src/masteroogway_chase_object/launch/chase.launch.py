@@ -10,6 +10,11 @@ def generate_launch_description():
         ),
         Node(
             package='masteroogway_chase_object',
+            executable='get_object_range',
+            output='screen'
+        ),
+        Node(
+            package='masteroogway_chase_object',
             executable='chase_object',
             output='screen'
         ),

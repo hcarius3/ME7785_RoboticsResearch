@@ -17,12 +17,13 @@ setup(
     zip_safe=True,
     maintainer='henDan',
     # maintainer_email='your_email@example.com',
-    description='ROS2 package for object following',
+    description='ROS2 package for cahsing object',
     license='MIT',
     tests_require=['pytest'],
     entry_points={
         'console_scripts': [
             'detect_object = masteroogway_chase_object.detect_object:main',
+            'get_object_range = masteroogway_chase_object.get_object_range:main',
             'chase_object = masteroogway_chase_object.chase_object:main',
         ],
     },
