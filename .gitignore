@@ -1,0 +1,50 @@
+# General OS-generated files
+.DS_Store
+Thumbs.db
+
+# Build and dependency directories
+turtlebot3_ws/build/
+turtlebot3_ws/devel/
+turtlebot3_ws/install/
+turtlebot3_ws/log/
+
+# Exclude sim packages
+turtlebot3_ws/src/turtlebot3_simulations
+turtlebot3_ws/src/turtlebot3_sim_update
+turtlebot3_ws/src/turtlebot3_msgs
+turtlebot3_ws/src/turtlebot3
+turtlebot3_ws/src/DynamixelSDK
+
+# ROS 2 colcon build artifacts
+colcon_workspace/
+colcon_cache/
+
+# Python cache and virtual environments
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+venv/
+.env
+
+# CMake build files
+CMakeCache.txt
+CMakeFiles/
+Makefile
+cmake_install.cmake
+
+# VSCode and JetBrains IDE settings
+.vscode/
+.idea/
+*.swp
+
+# ROS 2 launch and parameter files backups
+*.launch~
+*.yaml~
+
+# Custom exclusions
+*.log
+*.bag
+*.sqlite3
+*.rosinstall
+
