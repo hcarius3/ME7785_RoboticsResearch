@@ -4,5 +4,5 @@ masteroogway_object_follower
 # Bringup robot
 ros2 launch turtlebot3_bringup camera_robot.launch.py
 
-# Launch our package which starts 
+# Launch our package
 ros2 launch masteroogway_object_follower object_follower.launch.py
