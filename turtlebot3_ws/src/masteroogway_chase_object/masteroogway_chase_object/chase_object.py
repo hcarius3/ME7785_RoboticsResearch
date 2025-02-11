@@ -3,62 +3,78 @@
 
 import rclpy
 from rclpy.node import Node
-from geometry_msgs.msg import Point, Twist
+from geometry_msgs.msg import Point
+from geometry_msgs.msg import Twist
 import time
 
-class RotateRobot(Node):
-    def __init__(self):
-        super().__init__('rotate_robot')
-        
-        # Subscribe to object coordinates
-        self.subscription = self.create_subscription(Point, '/obj_angular_position', self.object_callback, 10)
-        # Publisher for robot velocity commands
-        self.publisher = self.create_publisher(Twist, '/cmd_vel', 10)
-        # Variable to track last message time
-        self.last_message_time = time.time()
-        # Timer to check if object detection is active
-        self.create_timer(1.0, self.check_timeout)  # Run every 1 second
+# Helper class for PID controller
+class PIDController:
+    def __init__(self, kp, ki, kd):
+        self.kp = kp
+        self.ki = ki
+        self.kd = kd
+        self.prev_error = 0.0
+        self.integral = 0.0
 
-        self.get_logger().info("Rotate Robot Node Initialized")
+    def compute(self, error, dt):
+        """Compute the PID output"""
+        self.integral += error * dt
+        derivative = (error - self.prev_error) / dt if dt > 0 else 0.0
+        output = self.kp * error + self.ki * self.integral + self.kd * derivative
+        self.prev_error = error
+        return output
+
+class ChaseObject(Node):
+    def __init__(self):
+        super().__init__('chase_object')
+        
+        # Subscribe to object range data
+        self.subscription = self.create_subscription(Point, '/object_range', self.object_callback, 10)
+        
+        # Publisher for velocity commands
+        self.publisher = self.create_publisher(Twist, '/cmd_vel', 10)
+
+        # PID controllers
+        self.angular_pid = PIDController(kp=1.0, ki=0.0, kd=0.1)  # Adjust values as needed
+        self.linear_pid = PIDController(kp=0.5, ki=0.0, kd=0.05)
+
+        self.target_distance = 0.5  # Desired distance from object in meters
+        self.last_time = time.time()
+
+        self.get_logger().info("ChaseObject Node Initialized")
 
     def object_callback(self, msg):
-        """Callback function when receiving object coordinates."""
-        self.last_message_time = time.time()  # Update last received time
-        twist = Twist()
-        center_x = 160  # Camera resolution 320x240
-        tolerance = 40  
+        """Compute and send velocity commands to follow the object."""
+        if len(msg.data) < 2:
+            return
 
-        if msg.x < center_x - tolerance:
-            twist.angular.z = 0.5  # Turn left
-        elif msg.x > center_x + tolerance:
-            twist.angular.z = -0.5  # Turn right
-        else:
-            twist.angular.z = 0.0  # Stop rotating
+        angle, distance = msg.data
+        current_time = time.time()
+        dt = current_time - self.last_time
+        self.last_time = current_time
+
+        # Compute PID outputs
+        angular_correction = self.angular_pid.compute(angle, dt)
+        distance_error = self.target_distance - distance
+        linear_correction = self.linear_pid.compute(distance_error, dt)
+
+        # Send velocity commands
+        twist = Twist()
+        twist.angular.z = angular_correction
+        twist.linear.x = linear_correction
 
         self.publisher.publish(twist)
 
-    def check_timeout(self):
-        """Check if a message was received recently; stop if no message is received."""
-        time_since_last_message = time.time() - self.last_message_time
-        
-        if time_since_last_message > 1.0:  # If no message for more than 1 second
-            twist = Twist()
-            twist.angular.z = 0.0  # Stop rotating
-            self.publisher.publish(twist)
-            self.get_logger().warn("No object detected, stopping robot.")
-
 def main():
-    rclpy.init()  # Initialize ROS2
-    node = RotateRobot()  # Create node object
-    
-    try:
-        rclpy.spin(node)  # Keep the node running
-    except SystemExit:
-        rclpy.logging.get_logger("Rotate Robot Node Info...").info("Shutting Down")
-    
-    # Clean up
-    node.destroy_node()  
-    rclpy.shutdown()
+	rclpy.init() # init routine needed for ROS2.
+	node = ChaseObject() # Create class object to be used.
+	try:
+		rclpy.spin(node) # Trigger callback processing.		
+	except SystemExit:
+		rclpy.logging.get_logger("Find Object Node Info...").info("Shutting Down")
+	# Clean up and shutdown.
+	node.destroy_node()  
+	rclpy.shutdown()
 
 if __name__ == '__main__':
     main()
