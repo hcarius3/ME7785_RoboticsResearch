@@ -1,7 +1,6 @@
 # ECE 7785 Intro to Robotics Research
 # Hendrik Carius and Daniel Terrell
 
-
 import rclpy
 from rclpy.node import Node
 from sensor_msgs.msg import CompressedImage
@@ -51,14 +50,15 @@ class FindObject(Node):
 
                 center_x = x + w // 2
                 center_y = y + h // 2
-                object_position.x = float(center_x)
-                object_position.y = float(center_y)
-                object_position.z = 0.0
+                # object_position.x = float(center_x)
+                # object_position.y = float(center_y)
+                # object_position.z = 0.0
 
-                # angular conversion
-                dx = center_x - frame_center_x
-                #dy = frame_center_y - center_y
-                angle = math.degrees(math.atan2(0,dx))
+                # Convert pixel x-coordinate to angle
+                image_width = frame.shape[1] # Should be 320
+                fov = 70  # Camera field of view in [degrees]
+                angle = (center_x - (image_width/2)) * (fov/image_width)
+                object_position.x = float(angle)
 
                 found = True
                 cv2.circle(frame, (center_x, center_y), 5, (0, 0, 255), -1)
@@ -74,13 +74,13 @@ class FindObject(Node):
         self.image_pub.publish(image_msg)
 
 def main():
-	rclpy.init() #init routine needed for ROS2.
-	node = FindObject() #Create class object to be used.
+	rclpy.init() # init routine needed for ROS2.
+	node = FindObject() # Create class object to be used.
 	try:
 		rclpy.spin(node) # Trigger callback processing.		
 	except SystemExit:
 		rclpy.logging.get_logger("Find Object Node Info...").info("Shutting Down")
-	#Clean up and shutdown.
+	# Clean up and shutdown.
 	node.destroy_node()  
 	rclpy.shutdown()
 
