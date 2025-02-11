@@ -8,7 +8,7 @@ turtlebot3_ws/devel/
 turtlebot3_ws/install/
 turtlebot3_ws/log/
 
-# Exclude sim packages
+# Exclude packages for the sim as well as already installed on the robot
 turtlebot3_ws/src/turtlebot3_simulations
 turtlebot3_ws/src/turtlebot3_sim_update
 turtlebot3_ws/src/turtlebot3_msgs
