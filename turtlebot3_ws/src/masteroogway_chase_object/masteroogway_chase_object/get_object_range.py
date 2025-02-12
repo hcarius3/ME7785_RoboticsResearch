@@ -52,7 +52,8 @@ class GetObjectRange(Node):
         angle_index = int((self.obj_angle + (fov / 2)))
 
         if 0 <= angle_index < len(self.lidar_data):
-            distance = self.lidar_data[angle_index]
+            distance = self.lidar_data[angle_index] # in mm
+            distance = distance*1e-3 # convert to m
         else:
             # something went wrong
             return
