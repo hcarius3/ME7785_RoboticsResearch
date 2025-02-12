@@ -42,6 +42,7 @@ class GetObjectRange(Node):
 
     def publish_object_range(self):
         """Match camera angle with LiDAR data and publish object position."""
+        # kinda not needed safety net
         if self.obj_angle is None or self.lidar_data is None:
             return
 
@@ -53,7 +54,8 @@ class GetObjectRange(Node):
         if 0 <= angle_index < len(self.lidar_data):
             distance = self.lidar_data[angle_index]
         else:
-            distance = float('inf')
+            # something went wrong
+            return
 
         # Publish object range
         point_msg = Point()

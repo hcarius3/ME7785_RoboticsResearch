@@ -35,9 +35,11 @@ class ChaseObject(Node):
         self.publisher = self.create_publisher(Twist, '/cmd_vel', 10)
 
         # PID controllers
-        self.angular_pid = PIDController(kp=1.0, ki=0.0, kd=0.1)  # Adjust values as needed
-        self.linear_pid = PIDController(kp=0.5, ki=0.0, kd=0.05)
+        self.angular_pid = PIDController(kp=2.0, ki=0.1, kd=0.1)  # Adjust values as needed
+        self.linear_pid = PIDController(kp=1.5, ki=0.1, kd=0.05)
 
+        # Desired Position
+        self.target_angle = 0 # Desired angle from object in degrees
         self.target_distance = 0.5  # Desired distance from object in meters
         self.last_time = time.time()
 
@@ -49,13 +51,13 @@ class ChaseObject(Node):
         # Extract message data
         angle = msg.x
         distance = msg.y
-        angle, distance = msg.data
         current_time = time.time()
         dt = current_time - self.last_time
         self.last_time = current_time
 
         # Compute PID outputs
-        angular_correction = self.angular_pid.compute(angle, dt)
+        angular_error = self.target_angle - angle
+        angular_correction = self.angular_pid.compute(angular_error, dt)
         distance_error = self.target_distance - distance
         linear_correction = self.linear_pid.compute(distance_error, dt)
 
