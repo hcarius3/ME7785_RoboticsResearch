@@ -12,13 +12,13 @@ class GetObjectRange(Node):
         super().__init__('get_object_range')
 
         # Subscribe to object coordinates (angle from camera)
-        self.subscription_camera = self.create_subscription(Point, '/obj_coordinates', self.object_callback, 10)
+        self.subscription_camera = self.create_subscription(Point, '/obj_angle', self.object_callback, 10)
 
         # Subscribe to LiDAR scan
         self.subscription_lidar = self.create_subscription(LaserScan, '/scan', self.lidar_callback, 10)
 
         # Publisher for object position with distance
-        self.publisher = self.create_publisher(Point, '/object_range', 10)
+        self.publisher = self.create_publisher(Point, '/obj_position', 10)
 
         # Initialize variables
         self.obj_angle = None

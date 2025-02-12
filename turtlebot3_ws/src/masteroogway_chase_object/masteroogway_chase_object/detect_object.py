@@ -7,17 +7,19 @@ from sensor_msgs.msg import CompressedImage
 from geometry_msgs.msg import Point
 import cv2
 import numpy as np
-import math
 
 class FindObject(Node):
     def __init__(self):
         super().__init__('detect_object')
-        self.image_sub = self.create_subscription(
-            CompressedImage, '/image_raw/compressed', self.image_callback, 10)
-        self.image_pub = self.create_publisher(
-            CompressedImage, '/obj_finder/compressed', 10)
-        self.coord_pub = self.create_publisher(
-            Point, '/obj_angular_position', 10)
+
+        # Subscribe to raw camera image
+        self.image_sub = self.create_subscription(CompressedImage, '/image_raw/compressed', self.image_callback, 10)
+        
+        # Published processed image
+        self.image_pub = self.create_publisher(CompressedImage, '/obj_finder/compressed', 10)
+        
+        # Publisher for object coordinates (angle from camera)
+        self.coord_pub = self.create_publisher(Point, '/obj_angel', 10)
         
 
         self.get_logger().info("FindObject Node Initialized")

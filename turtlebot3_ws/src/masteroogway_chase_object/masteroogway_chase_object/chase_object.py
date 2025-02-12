@@ -28,8 +28,8 @@ class ChaseObject(Node):
     def __init__(self):
         super().__init__('chase_object')
         
-        # Subscribe to object range data
-        self.subscription = self.create_subscription(Point, '/object_range', self.object_callback, 10)
+        # Subscribe to object position data
+        self.subscription = self.create_subscription(Point, '/obj_position', self.object_callback, 10)
         
         # Publisher for velocity commands
         self.publisher = self.create_publisher(Twist, '/cmd_vel', 10)
@@ -45,9 +45,10 @@ class ChaseObject(Node):
 
     def object_callback(self, msg):
         """Compute and send velocity commands to follow the object."""
-        if len(msg.data) < 2:
-            return
-
+        
+        # Extract message data
+        angle = msg.x
+        distance = msg.y
         angle, distance = msg.data
         current_time = time.time()
         dt = current_time - self.last_time
