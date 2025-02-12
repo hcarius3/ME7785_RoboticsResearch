@@ -40,7 +40,7 @@ class ChaseObject(Node):
 
         # Desired Position
         self.target_angle = 0 # Desired angle from object in degrees
-        self.target_distance = 0.5  # Desired distance from object in meters
+        self.target_distance = 200  # Desired distance from object in mm
         self.last_time = time.time()
 
         self.get_logger().info("ChaseObject Node Initialized")
