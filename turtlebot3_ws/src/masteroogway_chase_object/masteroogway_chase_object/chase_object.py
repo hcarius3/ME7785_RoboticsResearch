@@ -52,8 +52,21 @@ class ChaseObject(Node):
 
         # Timer
         self.last_time = time.time()
+        # Timer to check if object detection is active
+        self.create_timer(1.0, self.check_timeout)  # Run every 1 second
 
         self.get_logger().info("ChaseObject Node Initialized")
+
+    def check_timeout(self):
+        """Check if a message was received recently; stop if no message is received."""
+        time_since_last_message = time.time() - self.last_time
+        
+        if time_since_last_message > 1.0:  # If no message for more than 1 second
+            twist = Twist()
+            twist.angular.z = 0
+            twist.linear.x = 0
+            self.publisher.publish(twist)
+            self.get_logger().warn("No message received, stopping robot.")
 
     def object_callback(self, msg):
         """Compute and send velocity commands to follow the object."""
@@ -73,6 +86,8 @@ class ChaseObject(Node):
         else:
             # Compute PID output
             angular_correction = self.angular_pid.compute(angular_error, dt)
+            # Convert to radians
+            angular_correction = math.radians(angular_correction)
             # Limit output
             angular_correction = np.clip(angular_correction, -self.limit_angular, self.limit_angular)
 
@@ -92,6 +107,10 @@ class ChaseObject(Node):
         twist.angular.z = angular_correction
         twist.linear.x = linear_correction
 
+        # Logging
+        self.get_logger().info(f"Sending velocities: angular {angular_correction}rad/s, linear {linear_correction}m/s")
+
+        # Publish
         self.publisher.publish(twist)
 
 def main():
