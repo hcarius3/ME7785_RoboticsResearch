@@ -19,7 +19,7 @@ class FindObject(Node):
         self.image_pub = self.create_publisher(CompressedImage, '/obj_finder/compressed', 10)
         
         # Publisher for object coordinates (angle from camera)
-        self.coord_pub = self.create_publisher(Point, '/obj_angel', 10)
+        self.coord_pub = self.create_publisher(Point, '/obj_angle', 10)
         
 
         self.get_logger().info("FindObject Node Initialized")
