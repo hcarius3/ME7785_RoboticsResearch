@@ -6,6 +6,8 @@ from rclpy.node import Node
 from geometry_msgs.msg import Point
 from geometry_msgs.msg import Twist
 import time
+import math
+import numpy as np
 
 # Helper class for PID controller
 class PIDController:
@@ -40,7 +42,15 @@ class ChaseObject(Node):
 
         # Desired Position
         self.target_angle = 0 # Desired angle from object in degrees
-        self.target_distance = 200  # Desired distance from object in mm
+        self.tolerance_angle = 10 # +- angle tolerance in degrees
+        self.target_distance = 0.2  # Desired distance from object in m
+        self.tolerance_distance = 0.02  # +- distance tolerance in m
+        
+        # Velocity limits
+        self.limit_angular = 0.2 # in rad/s
+        self.limit_linear = 0.1 # in m/s
+
+        # Timer
         self.last_time = time.time()
 
         self.get_logger().info("ChaseObject Node Initialized")
@@ -49,17 +59,33 @@ class ChaseObject(Node):
         """Compute and send velocity commands to follow the object."""
         
         # Extract message data
-        angle = msg.x
-        distance = msg.y
+        angle = msg.x       # current angle in degree
+        distance = msg.y    # current distance in m
         current_time = time.time()
         dt = current_time - self.last_time
         self.last_time = current_time
 
-        # Compute PID outputs
+        # Compute angular PID output 
         angular_error = self.target_angle - angle
-        angular_correction = self.angular_pid.compute(angular_error, dt)
+        if angular_error <= self.tolerance_angle:
+            # Angle already within tolerance
+            angular_correction = 0
+        else:
+            # Compute PID output
+            angular_correction = self.angular_pid.compute(angular_error, dt)
+            # Limit output
+            angular_correction = np.clip(angular_correction, -self.limit_angular, self.limit_angular)
+
+        # Compute distance PID output 
         distance_error = self.target_distance - distance
-        linear_correction = self.linear_pid.compute(distance_error, dt)
+        if distance_error <= self.tolerance_distance:
+            # Distance already within tolerance
+            linear_correction = 0
+        else:
+            # Compute PID output
+            linear_correction = self.linear_pid.compute(distance_error, dt)
+            # Limit output
+            linear_correction = np.clip(linear_correction, -self.limit_linear, self.limit_linear)
 
         # Send velocity commands
         twist = Twist()
