@@ -37,7 +37,7 @@ class ChaseObject(Node):
         self.publisher = self.create_publisher(Twist, '/cmd_vel', 10)
 
         # PID controllers
-        self.angular_pid = PIDController(kp=5.0, ki=0.1, kd=0.1)  # Adjust values as needed
+        self.angular_pid = PIDController(kp=3, ki=0.1, kd=0.1)  # Adjust values as needed
         self.linear_pid = PIDController(kp=1.5, ki=0.1, kd=0.05)
 
         # Desired Position
@@ -47,8 +47,8 @@ class ChaseObject(Node):
         self.tolerance_distance = 0.02  # +- distance tolerance in m
         
         # Velocity limits
-        self.limit_angular = 20 # in deg/s
-        self.limit_linear = 0.1 # in m/s
+        self.limit_angular = 40 # in deg/s
+        self.limit_linear = 0.15 # in m/s
 
         # Timer
         self.last_time = time.time()
@@ -85,11 +85,11 @@ class ChaseObject(Node):
         # Compute angular PID output 
         angular_error = self.target_angle - angle
         if abs(angular_error) <= self.tolerance_angle:
+            # self.get_logger().info('Angle already within tolerance')
             # Angle already within tolerance
-            self.get_logger().info('Angle already within tolerance')
             angular_correction = 0.0
         else:
-            self.get_logger().info('Compute angular PID output')
+            # self.get_logger().info('Compute angular PID output')
             # Compute PID output
             angular_correction = self.angular_pid.compute(angular_error, dt)
             # Limit output
@@ -113,7 +113,7 @@ class ChaseObject(Node):
         # Send velocity commands
         twist = Twist()
         twist.angular.z = float(angular_correction)
-        # twist.linear.x = float(linear_correction)
+        twist.linear.x = float(linear_correction)
         self.get_logger().info(f"Sending velocities: angular {angular_correction}rad/s, linear {linear_correction}m/s")
 
         # Publish
