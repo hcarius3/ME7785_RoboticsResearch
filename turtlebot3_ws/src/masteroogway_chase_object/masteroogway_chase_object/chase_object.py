@@ -37,13 +37,13 @@ class ChaseObject(Node):
         self.publisher = self.create_publisher(Twist, '/cmd_vel', 10)
 
         # PID controllers
-        self.angular_pid = PIDController(kp=2.0, ki=0.1, kd=0.1)  # Adjust values as needed
+        self.angular_pid = PIDController(kp=5.0, ki=0.1, kd=0.1)  # Adjust values as needed
         self.linear_pid = PIDController(kp=1.5, ki=0.1, kd=0.05)
 
         # Desired Position
         self.target_angle = 0 # Desired angle from object in deg
         self.tolerance_angle = 10 # +- angle tolerance in deg
-        self.target_distance = 0.2  # Desired distance from object in m
+        self.target_distance = 0.5  # Desired distance from object in m
         self.tolerance_distance = 0.02  # +- distance tolerance in m
         
         # Velocity limits
@@ -84,34 +84,36 @@ class ChaseObject(Node):
 
         # Compute angular PID output 
         angular_error = self.target_angle - angle
-        if angular_error <= self.tolerance_angle:
+        if abs(angular_error) <= self.tolerance_angle:
             # Angle already within tolerance
+            self.get_logger().info('Angle already within tolerance')
             angular_correction = 0.0
         else:
+            self.get_logger().info('Compute angular PID output')
             # Compute PID output
             angular_correction = self.angular_pid.compute(angular_error, dt)
             # Limit output
             angular_correction = np.clip(angular_correction, -self.limit_angular, self.limit_angular)
             # Convert to rad
-            angular_correction = math.radians[angular_correction]
+            angular_correction = math.radians(angular_correction)
 
         # Compute distance PID output 
         distance_error = self.target_distance - distance
-        if distance_error <= self.tolerance_distance:
+        if abs(distance_error) <= self.tolerance_distance:
             # Distance already within tolerance
-            linear_correction = 0
+            linear_correction = 0.0
         else:
             # Compute PID output
             linear_correction = self.linear_pid.compute(distance_error, dt)
             # Limit output
             linear_correction = np.clip(linear_correction, -self.limit_linear, self.limit_linear)
 
+        self.get_logger().info(f"Error: Distance {distance_error:.2f}m, Angular {angular_error}°")
+
         # Send velocity commands
         twist = Twist()
         twist.angular.z = float(angular_correction)
-        twist.linear.x = float(linear_correction)
-
-        # Logging
+        # twist.linear.x = float(linear_correction)
         self.get_logger().info(f"Sending velocities: angular {angular_correction}rad/s, linear {linear_correction}m/s")
 
         # Publish
