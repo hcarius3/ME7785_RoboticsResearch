@@ -41,8 +41,8 @@ class ChaseObject(Node):
         self.linear_pid = PIDController(kp=1.5, ki=0.1, kd=0.05)
 
         # Desired Position
-        self.target_angle = 0 # Desired angle from object in degrees
-        self.tolerance_angle = 10 # +- angle tolerance in degrees
+        self.target_angle = 0 # Desired angle from object in rad
+        self.tolerance_angle = math.radians(10) # +- angle tolerance in rad
         self.target_distance = 0.2  # Desired distance from object in m
         self.tolerance_distance = 0.02  # +- distance tolerance in m
         
@@ -63,8 +63,8 @@ class ChaseObject(Node):
         
         if time_since_last_message > 1.0:  # If no message for more than 1 second
             twist = Twist()
-            twist.angular.z = 0
-            twist.linear.x = 0
+            twist.angular.z = 0.0
+            twist.linear.x = 0.0
             self.publisher.publish(twist)
             self.get_logger().warn("No message received, stopping robot.")
 
@@ -86,8 +86,6 @@ class ChaseObject(Node):
         else:
             # Compute PID output
             angular_correction = self.angular_pid.compute(angular_error, dt)
-            # Convert to radians
-            angular_correction = math.radians(angular_correction)
             # Limit output
             angular_correction = np.clip(angular_correction, -self.limit_angular, self.limit_angular)
 
@@ -104,8 +102,8 @@ class ChaseObject(Node):
 
         # Send velocity commands
         twist = Twist()
-        twist.angular.z = angular_correction
-        twist.linear.x = linear_correction
+        twist.angular.z = float(angular_correction)
+        twist.linear.x = float(linear_correction)
 
         # Logging
         self.get_logger().info(f"Sending velocities: angular {angular_correction}rad/s, linear {linear_correction}m/s")

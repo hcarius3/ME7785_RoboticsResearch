@@ -7,6 +7,7 @@ from sensor_msgs.msg import CompressedImage
 from geometry_msgs.msg import Point
 import cv2
 import numpy as np
+import math
 
 class FindObject(Node):
     def __init__(self):
@@ -60,7 +61,7 @@ class FindObject(Node):
                 image_width = frame.shape[1] # Should be 320
                 fov = 70  # Camera field of view in [degrees]
                 angle = (center_x - (image_width/2)) * (fov/image_width)
-                object_position.x = float(angle)
+                object_position.x = math.radians(angle)
 
                 found = True
                 cv2.circle(frame, (center_x, center_y), 5, (0, 0, 255), -1)
