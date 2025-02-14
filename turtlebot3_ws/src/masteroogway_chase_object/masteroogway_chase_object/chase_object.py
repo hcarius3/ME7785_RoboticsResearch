@@ -41,13 +41,13 @@ class ChaseObject(Node):
         self.linear_pid = PIDController(kp=1.5, ki=0.1, kd=0.05)
 
         # Desired Position
-        self.target_angle = 0 # Desired angle from object in rad
-        self.tolerance_angle = math.radians(10) # +- angle tolerance in rad
+        self.target_angle = 0 # Desired angle from object in deg
+        self.tolerance_angle = 10 # +- angle tolerance in deg
         self.target_distance = 0.2  # Desired distance from object in m
         self.tolerance_distance = 0.02  # +- distance tolerance in m
         
         # Velocity limits
-        self.limit_angular = 0.2 # in rad/s
+        self.limit_angular = 20 # in deg/s
         self.limit_linear = 0.1 # in m/s
 
         # Timer
@@ -72,7 +72,11 @@ class ChaseObject(Node):
         """Compute and send velocity commands to follow the object."""
         
         # Extract message data
-        angle = msg.x       # current angle in degree
+        angle = msg.x       # current angle in rad [0,2pi]
+        # Shift to [-180°, 180°]
+        angle = math.degrees(angle)  # Convert to degrees
+        if angle > 180:  
+            angle -= 360  
         distance = msg.y    # current distance in m
         current_time = time.time()
         dt = current_time - self.last_time
@@ -82,12 +86,14 @@ class ChaseObject(Node):
         angular_error = self.target_angle - angle
         if angular_error <= self.tolerance_angle:
             # Angle already within tolerance
-            angular_correction = 0
+            angular_correction = 0.0
         else:
             # Compute PID output
             angular_correction = self.angular_pid.compute(angular_error, dt)
             # Limit output
             angular_correction = np.clip(angular_correction, -self.limit_angular, self.limit_angular)
+            # Convert to rad
+            angular_correction = math.radians[angular_correction]
 
         # Compute distance PID output 
         distance_error = self.target_distance - distance
