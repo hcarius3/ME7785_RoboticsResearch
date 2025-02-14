@@ -33,7 +33,7 @@ class GetObjectRange(Node):
 
     def object_callback(self, msg):
         """Receive object angle from detect_object node."""
-        self.obj_angle = msg.x  # Angle in radians
+        self.obj_angle = msg.x  # Angle in radians from [0,2π]
 
         # Reset last angle message timer
         self.last_time = time.time()
@@ -43,7 +43,7 @@ class GetObjectRange(Node):
 
     def lidar_callback(self, msg):
         """Receive LiDAR scan data."""
-        self.lidar_data = msg.ranges  # Distance array
+        self.lidar_data = msg  # Complete LaserScan message
 
         if self.obj_angle is not None:
             self.publish_object_range()
@@ -56,33 +56,36 @@ class GetObjectRange(Node):
             return
 
         # Return if data not available 
-        if self.obj_angle is None or self.lidar_data is None:
+        if self.obj_angle is None or math.isnan(self.obj_angle) or self.lidar_data is None:
             return
-
-        # Convert angle to LiDAR index
-        self.obj_angle = self.obj_angle + math.pi  # Shift range from [-π, π] to [0, 2π]
-        angle_per_step = (2 * math.pi) / 360  # One step in radians (Lidar sends 360 steps)
-        angle_index = int(round(self.obj_angle / angle_per_step))  # Convert to index
 
         # Get LiDAR distance
-        if 0 <= angle_index < len(self.lidar_data):
-            distance = self.lidar_data[angle_index] # in mm
-            distance = distance*1e-3 # convert to m
-        else:
-            # something went wrong
+        # distance = self.get_range_at_angle(self.lidar_data, self.obj_angle) # get distance in m
+        # Ensure the angle is within the LiDAR's scanning range
+        if self.obj_angle < self.lidar_data.angle_min or self.obj_angle > self.lidar_data.angle_max:
+            return
+        # Compute the index in the ranges array
+        range_indx = int(round((self.obj_angle - self.lidar_data.angle_min) / self.lidar_data.angle_increment))
+        # Ensure index is within valid bounds
+        if range_indx < 0 or range_indx >= len(self.lidar_data.ranges):
+            return
+        # Get the range value, checking for NaN
+        distance = self.lidar_data.ranges[range_indx] # in m
+        # if math.isnan(distance) or distance < self.lidar_data.range_min or distance > self.lidar_data.range_max:
+        #     return None
+        if math.isnan(distance):
             return
 
-        # Return for nan data
-        if math.isnan(distance) or math.isnan(self.obj_angle):
-            return
-        
-        # Publish object range
-        point_msg = Point()
-        point_msg.x = self.obj_angle
-        point_msg.y = distance
-        self.publisher.publish(point_msg)
+        # Publish object position if available
+        if distance is not None:
+            self.get_logger().info(f"Object at Angle: {self.obj_angle:.2f}rad, LiDAR index: {range_indx}, Distance: {distance:.2f}m")
 
-        self.get_logger().info(f"Object at Angle: {self.obj_angle:.2f}°, Distance: {distance:.2f}m")
+            # Publish
+            point_msg = Point()
+            point_msg.x = self.obj_angle
+            point_msg.y = distance
+            self.publisher.publish(point_msg)
+
 
 def main():
 	rclpy.init() # init routine needed for ROS2.

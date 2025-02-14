@@ -60,12 +60,14 @@ class FindObject(Node):
                 # Convert pixel x-coordinate to angle
                 image_width = frame.shape[1] # Should be 320
                 fov = 70  # Camera field of view in [degrees]
-                angle = (center_x - (image_width/2)) * (fov/image_width)
-                object_position.x = math.radians(angle)
+                angle = (center_x - (image_width/2)) * (fov/image_width) # in degrees 
+                angle_rad = math.radians(angle)  # Convert degrees to radians
+                angle_rad = angle_rad % (2 * math.pi)  # Normalize to [0, 2π]
+                object_position.x = angle_rad
 
                 found = True
                 cv2.circle(frame, (center_x, center_y), 5, (0, 0, 255), -1)
-                self.get_logger().info(f"Object found at: ({center_x}, {center_y}), Angle: {angle:.2f} degrees")
+                self.get_logger().info(f"Object found at: ({center_x}, {center_y}), Angle: {angle:.2f}° = {angle_rad:.2f} rad")
         if found:
             self.coord_pub.publish(object_position)
 
