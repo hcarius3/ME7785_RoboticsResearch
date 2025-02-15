@@ -29,15 +29,15 @@ class FindObject(Node):
         np_arr = np.frombuffer(msg.data, np.uint8)
         frame = cv2.imdecode(np_arr, cv2.IMREAD_COLOR)
 
-        # lower_green = np.array([35, 50, 50])
-        # upper_green = np.array([85, 255, 255])
-        lower_yellow = np.array([20, 100, 100])
-        upper_yellow = np.array([30, 255, 255])
+        lower_green = np.array([35, 50, 50])
+        upper_green = np.array([85, 255, 255])
+        # lower_yellow = np.array([20, 100, 100])
+        # upper_yellow = np.array([30, 255, 255])
 
 
         hsv_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
-        # mask = cv2.inRange(hsv_frame, lower_green, upper_green)
-        mask = cv2.inRange(hsv_frame, lower_yellow, upper_yellow)
+        mask = cv2.inRange(hsv_frame, lower_green, upper_green)
+        # mask = cv2.inRange(hsv_frame, lower_yellow, upper_yellow)
         contours, _ = cv2.findContours(mask, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
 
         object_position = Point()
@@ -67,7 +67,7 @@ class FindObject(Node):
 
                 found = True
                 cv2.circle(frame, (center_x, center_y), 5, (0, 0, 255), -1)
-                self.get_logger().info(f"Object found at: ({center_x}, {center_y}), Angle: {angle:.2f}° = {angle_rad:.2f} rad")
+                #self.get_logger().info(f"Object found at: ({center_x}, {center_y}), Angle: {angle:.2f}° = {angle_rad:.2f} rad")
         if found:
             self.coord_pub.publish(object_position)
 

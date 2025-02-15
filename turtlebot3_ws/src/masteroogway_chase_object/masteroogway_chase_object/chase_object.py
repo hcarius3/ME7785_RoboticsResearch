@@ -37,14 +37,15 @@ class ChaseObject(Node):
         self.publisher = self.create_publisher(Twist, '/cmd_vel', 10)
 
         # PID controllers
-        self.angular_pid = PIDController(kp=3, ki=0.1, kd=0.1)  # Adjust values as needed
-        self.linear_pid = PIDController(kp=1.5, ki=0.1, kd=0.05)
+        # self.angular_pid = PIDController(kp=3, ki=0.1, kd=0.1)  # Adjust values as needed
+        self.angular_pid = PIDController(kp=3, ki=0.01, kd=0.01)
+        self.linear_pid = PIDController(kp=1.5, ki=0.0, kd=0.0)
 
         # Desired Position
         self.target_angle = 0 # Desired angle from object in deg
         self.tolerance_angle = 10 # +- angle tolerance in deg
         self.target_distance = 0.5  # Desired distance from object in m
-        self.tolerance_distance = 0.02  # +- distance tolerance in m
+        self.tolerance_distance = 0.05  # +- distance tolerance in m
         
         # Velocity limits
         self.limit_angular = 40 # in deg/s
@@ -53,7 +54,7 @@ class ChaseObject(Node):
         # Timer
         self.last_time = time.time()
         # Timer to check if object detection is active
-        self.create_timer(1.0, self.check_timeout)  # Run every 1 second
+        self.create_timer(0.5, self.check_timeout)  # Run every 1 second
 
         self.get_logger().info("ChaseObject Node Initialized")
 
@@ -61,7 +62,7 @@ class ChaseObject(Node):
         """Check if a message was received recently; stop if no message is received."""
         time_since_last_message = time.time() - self.last_time
         
-        if time_since_last_message > 1.0:  # If no message for more than 1 second
+        if time_since_last_message > 0.5:  # If no message for more than 1 second
             twist = Twist()
             twist.angular.z = 0.0
             twist.linear.x = 0.0
@@ -98,7 +99,7 @@ class ChaseObject(Node):
             angular_correction = math.radians(angular_correction)
 
         # Compute distance PID output 
-        distance_error = self.target_distance - distance
+        distance_error = distance - self.target_distance
         if abs(distance_error) <= self.tolerance_distance:
             # Distance already within tolerance
             linear_correction = 0.0
@@ -108,13 +109,14 @@ class ChaseObject(Node):
             # Limit output
             linear_correction = np.clip(linear_correction, -self.limit_linear, self.limit_linear)
 
-        self.get_logger().info(f"Error: Distance {distance_error:.2f}m, Angular {angular_error}°")
-
+        # self.get_logger().info(f"Error: Distance {distance_error:.2f}m, Angular {angular_error}°")
+    
         # Send velocity commands
         twist = Twist()
         twist.angular.z = float(angular_correction)
         twist.linear.x = float(linear_correction)
-        self.get_logger().info(f"Sending velocities: angular {angular_correction}rad/s, linear {linear_correction}m/s")
+        self.get_logger().info(f"Distance: {distance:.2f}m, Distance Error: {distance_error:.2f}m, Linear Correction: {linear_correction:.2f}m/s")
+        # self.get_logger().info(f"Sending velocities: angular {angular_correction}rad/s, linear {linear_correction}m/s")
 
         # Publish
         self.publisher.publish(twist)

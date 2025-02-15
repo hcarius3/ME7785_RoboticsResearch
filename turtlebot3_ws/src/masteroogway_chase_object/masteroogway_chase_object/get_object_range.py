@@ -52,39 +52,42 @@ class GetObjectRange(Node):
         """Match camera angle with LiDAR data and publish object position."""
         # Return if angle message is old
         time_since_last_message = time.time() - self.last_time
-        if time_since_last_message > 1.0:  # If no message for more than 1 second
+        if time_since_last_message > 1.0:
             return
 
-        # Return if data not available 
         if self.obj_angle is None or math.isnan(self.obj_angle) or self.lidar_data is None:
             return
 
-        # Get LiDAR distance
-        # distance = self.get_range_at_angle(self.lidar_data, self.obj_angle) # get distance in m
-        # Ensure the angle is within the LiDAR's scanning range
-        if self.obj_angle < self.lidar_data.angle_min or self.obj_angle > self.lidar_data.angle_max:
+        # Normalize angle into LiDAR's reference frame
+        obj_angle_norm = ((self.obj_angle + math.pi) % (2 * math.pi)) - math.pi
+
+        if obj_angle_norm < self.lidar_data.angle_min or obj_angle_norm > self.lidar_data.angle_max:
             return
+
         # Compute the index in the ranges array
-        range_indx = int(round((self.obj_angle - self.lidar_data.angle_min) / self.lidar_data.angle_increment))
-        # Ensure index is within valid bounds
-        if range_indx < 0 or range_indx >= len(self.lidar_data.ranges):
-            return
-        # Get the range value, checking for NaN
-        distance = self.lidar_data.ranges[range_indx] # in m
-        # if math.isnan(distance) or distance < self.lidar_data.range_min or distance > self.lidar_data.range_max:
-        #     return None
-        if math.isnan(distance):
+        range_indx = int((obj_angle_norm - self.lidar_data.angle_min) / self.lidar_data.angle_increment)
+
+        # Clip index within valid bounds
+        range_indx = max(0, min(range_indx, len(self.lidar_data.ranges) - 1))
+
+        # Get the range value and validate
+        distance = self.lidar_data.ranges[range_indx]
+        if math.isnan(distance) or distance < self.lidar_data.range_min or distance > self.lidar_data.range_max:
             return
 
-        # Publish object position if available
-        if distance is not None:
-            self.get_logger().info(f"Object at Angle: {self.obj_angle:.2f}rad, LiDAR index: {range_indx}, Distance: {distance:.2f}m")
+        # Publish object position
+        self.get_logger().info(f"Object at Angle: {obj_angle_norm:.2f}rad, LiDAR index: {range_indx}, Distance: {distance:.2f}m")
 
-            # Publish
-            point_msg = Point()
-            point_msg.x = self.obj_angle
-            point_msg.y = distance
-            self.publisher.publish(point_msg)
+        self.get_logger().info(f"Received obj_angle: {self.obj_angle:.2f}rad")
+        self.get_logger().info(f"Normalized obj_angle: {obj_angle_norm:.2f}rad")
+        self.get_logger().info(f"Computed index: {range_indx}, LiDAR distance: {distance:.2f}m")
+
+        point_msg = Point()
+        point_msg.x = obj_angle_norm  # Store normalized angle
+        point_msg.y = distance
+        self.publisher.publish(point_msg)
+
+
 
 
 def main():
