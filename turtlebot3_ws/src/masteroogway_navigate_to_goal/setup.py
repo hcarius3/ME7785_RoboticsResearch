@@ -24,6 +24,7 @@ setup(
         'console_scripts': [
             'goToGoal = masteroogway_navigate_to_goal.goToGoal:main',
             'getObjectRange = masteroogway_navigate_to_goal.getObjectRange:main',
+            'detect_object = masteroogway_navigate_to_goal.detect_object:main',
         ],
     },
 )
