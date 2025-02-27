@@ -24,11 +24,7 @@ setup(
         'console_scripts': [
             'goToGoal = masteroogway_navigate_to_goal.goToGoal:main',
             'getObjectRange = masteroogway_navigate_to_goal.getObjectRange:main',
-<<<<<<< HEAD
-            'odomListener = masteroogway_navigate_to_goal.odomListener:main',
-=======
-            'detect_object = masteroogway_navigate_to_goal.detect_object:main',
->>>>>>> f59fadb41af4fec4244d2f9d11665f8a9c4f830b
+            'printFixedOdometry = masteroogway_navigate_to_goal.print_fixed_odometry:main',
         ],
     },
 )
