@@ -3,6 +3,7 @@
 
 import rclpy
 from rclpy.node import Node
+from geometry_msgs.msg import Point
 from geometry_msgs.msg import Twist
 from nav_msgs.msg import Odometry
 import numpy as np
@@ -26,16 +27,21 @@ class PIDController:
         self.prev_error = error
         return output
 
+# Main Node
 class GoToGoal(Node):
     def __init__(self):
         super().__init__('go_to_goal')
         self.subscription = self.create_subscription(Odometry, '/odom', self.odom_callback, 10)
         self.publisher = self.create_publisher(Twist, '/cmd_vel', 10)
-        self.subscription  # Prevent unused variable warning
-        
-        # Start position
-        self.current_position = np.array([0.0, 0.0])
-        self.current_yaw = 0.0
+        # self.subscription  # subscribe to getObjectRange later
+
+        # Odom position
+        self.Init = True
+        self.Init_pos = Point()
+        self.Init_pos.x = 0.0
+        self.Init_pos.y = 0.0
+        self.Init_ang = 0.0
+        self.globalPos = Point()
         
         # Init PID controllers
         self.linear_pid = PIDController(1.0, 0.0, 0.1)
@@ -54,126 +60,83 @@ class GoToGoal(Node):
         self.timer = self.create_timer(0.1, self.control_loop)
     
     def load_waypoints(self):
-        waypoints_path = os.path.join(os.path.dirname(__file__), 'waypoints.txt')
+        # Adjust path to point to the correct location in the source directory
+        package_src_directory = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../../src/masteroogway_navigate_to_goal/masteroogway_navigate_to_goal/'))
+        waypoints_path = os.path.join(package_src_directory, 'waypoints.txt')
+
         with open(waypoints_path, 'r') as f:
             self.waypoints = [list(map(float, line.strip().split())) for line in f.readlines()]
     
-    def odom_callback(self, msg):
-        position = msg.pose.pose.position
-        q = msg.pose.pose.orientation
-        self.current_position = np.array([position.x, position.y])
-        self.current_yaw = np.arctan2(2*(q.w*q.z+q.x*q.y), 1-2*(q.y*q.y+q.z*q.z))
+    def update_Odometry(self, Odom):
+        position = Odom.pose.pose.position
+        
+        # Orientation uses the quaternion aprametrization.
+        # To get the angular position along the z-axis, the following equation is required.
+        q = Odom.pose.pose.orientation
+        orientation = np.arctan2(2*(q.w*q.z+q.x*q.y),1-2*(q.y*q.y+q.z*q.z))
+        if self.Init:
+            # The initial data is stored to by subtracted to all the other values as we want to start at position (0,0) and orientation 0
+            self.Init = False
+            self.Init_ang = orientation
+            self.globalAng = self.Init_ang
+            Mrot = np.matrix([[np.cos(self.Init_ang), np.sin(self.Init_ang)],[-np.sin(self.Init_ang), np.cos(self.Init_ang)]])        
+            self.Init_pos.x = Mrot.item((0,0))*position.x + Mrot.item((0,1))*position.y
+            self.Init_pos.y = Mrot.item((1,0))*position.x + Mrot.item((1,1))*position.y
+            self.Init_pos.z = position.z
+        Mrot = np.matrix([[np.cos(self.Init_ang), np.sin(self.Init_ang)],[-np.sin(self.Init_ang), np.cos(self.Init_ang)]])        
+
+        # We subtract the initial values
+        self.globalPos.x = Mrot.item((0,0))*position.x + Mrot.item((0,1))*position.y - self.Init_pos.x
+        self.globalPos.y = Mrot.item((1,0))*position.x + Mrot.item((1,1))*position.y - self.Init_pos.y
+        self.globalAng = orientation - self.Init_ang
     
     def control_loop(self):
+        # Stop after last waypoint got reached
         if self.current_goal_index >= len(self.waypoints):
             self.get_logger().info('All waypoints reached!')
             return
         
+        # Update time
         current_time = time.time()
         dt = current_time - self.last_time
         self.last_time = current_time
         
+        # Set new goal
         goal = np.array(self.waypoints[self.current_goal_index])
         vector_to_goal = goal - self.current_position
         distance = np.linalg.norm(vector_to_goal)
         desired_angle = np.arctan2(vector_to_goal[1], vector_to_goal[0])
         angle_error = desired_angle - self.current_yaw
         
-        linear_speed = self.linear_pid.compute(distance, dt)
-        angular_speed = self.angular_pid.compute(angle_error, dt)
-        
+        # Rotate until aligned with goal. Only then drive forward
         twist = Twist()
-        twist.linear.x = min(linear_speed, 0.2)
-        twist.angular.z = min(max(angular_speed, -1.5), 1.5)
-        self.publisher.publish(twist)
+        if abs(angle_error) > 0.1:
+            # Stop linear movement and rotate
+            twist.linear.x = 0
+            # Compute PID output
+            angular_vel = self.angular_pid.compute(angle_error, dt)
+            twist.angular.z = min(max(angular_vel, -self.limit_angular), self.limit_angular)
+        else:
+            # Stop rotating
+            twist.angular.z = 0
+            # Drive towards goal
+            linear_vel = self.linear_pid.compute(distance, dt)
+            twist.linear.z = min(max(linear_vel, -self.limit_linear), self.limit_linear)
         
-        if distance < 0.01:
+        if distance < 0.01: # in m
+            # Stop movement
+            twist.linear.x = 0
+            twist.angular.z = 0#
+            # Log and sleep
             self.get_logger().info(f'Goal {self.current_goal_index} reached. Waiting 10s...')
             time.sleep(10)
             self.current_goal_index += 1
 
-
-class ChaseObject(Node):
-    def __init__(self):
-        super().__init__('chase_object')
-        
-        
-        
-        
-
-        # Timer
-        self.last_time = time.time()
-        # Timer to check if object detection is active
-        self.create_timer(0.5, self.check_timeout)  # Run every 1 second
-
-        self.get_logger().info("ChaseObject Node Initialized")
-
-    def check_timeout(self):
-        """Check if a message was received recently; stop if no message is received."""
-        time_since_last_message = time.time() - self.last_time
-        
-        if time_since_last_message > 0.5:  # If no message for more than 1 second
-            twist = Twist()
-            twist.angular.z = 0.0
-            twist.linear.x = 0.0
-            self.publisher.publish(twist)
-            self.get_logger().warn("No message received, stopping robot.")
-
-    def object_callback(self, msg):
-        """Compute and send velocity commands to follow the object."""
-        
-        # Extract message data
-        angle = msg.x       # current angle in rad [0,2pi]
-        # Shift to [-180°, 180°]
-        angle = math.degrees(angle)  # Convert to degrees
-        if angle > 180:  
-            angle -= 360  
-        distance = msg.y    # current distance in m
-        current_time = time.time()
-        dt = current_time - self.last_time
-        self.last_time = current_time
-
-        # Compute angular PID output 
-        angular_error = self.target_angle - angle
-        if abs(angular_error) <= self.tolerance_angle:
-            # self.get_logger().info('Angle already within tolerance')
-            # Angle already within tolerance
-            angular_correction = 0.0
-        else:
-            # self.get_logger().info('Compute angular PID output')
-            # Compute PID output
-            angular_correction = self.angular_pid.compute(angular_error, dt)
-            # Limit output
-            angular_correction = np.clip(angular_correction, -self.limit_angular, self.limit_angular)
-            # Convert to rad
-            angular_correction = math.radians(angular_correction)
-
-        # Compute distance PID output 
-        distance_error = distance - self.target_distance
-        if abs(distance_error) <= self.tolerance_distance:
-            # Distance already within tolerance
-            linear_correction = 0.0
-        else:
-            # Compute PID output
-            linear_correction = self.linear_pid.compute(distance_error, dt)
-            # Limit output
-            linear_correction = np.clip(linear_correction, -self.limit_linear, self.limit_linear)
-
-        # self.get_logger().info(f"Error: Distance {distance_error:.2f}m, Angular {angular_error}°")
-    
-        # Send velocity commands
-        twist = Twist()
-        twist.angular.z = float(angular_correction)
-        twist.linear.x = float(linear_correction)
-        self.get_logger().info(f"Distance: {distance:.2f}m, Distance Error: {distance_error:.2f}m, Linear Correction: {linear_correction:.2f}m/s")
-        # self.get_logger().info(f"Sending velocities: angular {angular_correction}rad/s, linear {linear_correction}m/s")
-
-        # Publish
         self.publisher.publish(twist)
 
 def main():
 	rclpy.init() # init routine needed for ROS2.
-	node = ChaseObject() # Create class object to be used.
+	node = GoToGoal() # Create class object to be used.
 	try:
 		rclpy.spin(node) # Trigger callback processing.		
 	except SystemExit:
