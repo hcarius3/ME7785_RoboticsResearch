@@ -13,7 +13,7 @@ class OdomListener(Node):
         self.subscription = self.create_subscription(
             Odometry,
             '/odom',
-            self.odom_callback,
+            self.update_Odometry,
             10
         )
         self.subscription  # Prevent unused variable warning
@@ -23,11 +23,7 @@ class OdomListener(Node):
         self.Init_ang = 0.0
         self.Init_pos = np.zeros(3)
         self.globalPos = np.zeros(3)
-        self.globalAng = 0.0
-
-    def odom_callback(self, msg):
-        self.update_Odometry(msg)
-        self.get_logger().info(f'Corrected Position: ({self.globalPos[0]:.2f}, {self.globalPos[1]:.2f}), Yaw: {self.globalAng:.2f} rad')
+        self.globalAng = 0.0        
 
     def update_Odometry(self, Odom):
         position = Odom.pose.pose.position
@@ -40,23 +36,25 @@ class OdomListener(Node):
             self.Init = False
             self.Init_ang = orientation
             self.globalAng = self.Init_ang
-            Mrot = np.matrix([[np.cos(self.Init_ang), np.sin(self.Init_ang)], [-np.sin(self.Init_ang), np.cos(self.Init_ang)]])        
+            self.Mrot = np.matrix([[np.cos(self.Init_ang), np.sin(self.Init_ang)], [-np.sin(self.Init_ang), np.cos(self.Init_ang)]])        
             self.Init_pos = np.array([
-                Mrot.item((0,0))*position.x + Mrot.item((0,1))*position.y,
-                Mrot.item((1,0))*position.x + Mrot.item((1,1))*position.y,
+                self.Mrot.item((0,0))*position.x + self.Mrot.item((0,1))*position.y,
+                self.Mrot.item((1,0))*position.x + self.Mrot.item((1,1))*position.y,
                 position.z
             ])
         
-        Mrot = np.matrix([[np.cos(self.Init_ang), np.sin(self.Init_ang)], [-np.sin(self.Init_ang), np.cos(self.Init_ang)]])        
+        # self.Mrot = np.matrix([[np.cos(self.Init_ang), np.sin(self.Init_ang)], [-np.sin(self.Init_ang), np.cos(self.Init_ang)]])        
         
         # Apply the transformation to correct odometry
         self.globalPos = np.array([
-            Mrot.item((0,0))*position.x + Mrot.item((0,1))*position.y - self.Init_pos[0],
-            Mrot.item((1,0))*position.x + Mrot.item((1,1))*position.y - self.Init_pos[1],
+            self.Mrot.item((0,0))*position.x + self.Mrot.item((0,1))*position.y - self.Init_pos[0],
+            self.Mrot.item((1,0))*position.x + self.Mrot.item((1,1))*position.y - self.Init_pos[1],
             position.z - self.Init_pos[2]
         ])
         self.globalAng = orientation - self.Init_ang
 
+        self.get_logger().info(f'Corrected Position: ({self.globalPos[0]:.2f}, {self.globalPos[1]:.2f}), Yaw: {self.globalAng:.2f} rad')
+        
 
 
 def main():

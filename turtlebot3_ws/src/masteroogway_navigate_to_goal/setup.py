@@ -17,7 +17,7 @@ setup(
     zip_safe=True,
     maintainer='henDan',
     # maintainer_email='your_email@example.com',
-    description='ROS2 package for cahsing object',
+    description='ROS2 package for parcour',
     license='MIT',
     tests_require=['pytest'],
     entry_points={
@@ -25,6 +25,7 @@ setup(
             'goToGoal = masteroogway_navigate_to_goal.goToGoal:main',
             'getObjectRange = masteroogway_navigate_to_goal.getObjectRange:main',
             'printFixedOdometry = masteroogway_navigate_to_goal.print_fixed_odometry:main',
+            'odomListener = masteroogway_navigate_to_goal.TEMP_odomListener:main',
         ],
     },
 )
