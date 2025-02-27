@@ -13,5 +13,10 @@ def generate_launch_description():
             executable='getObjectRange',
             output='screen'
         ),
+        Node(
+            package='masteroogway_navigate_to_goal',
+            executable='detect_object',
+            output='screen'
+        ),
     ])
 
