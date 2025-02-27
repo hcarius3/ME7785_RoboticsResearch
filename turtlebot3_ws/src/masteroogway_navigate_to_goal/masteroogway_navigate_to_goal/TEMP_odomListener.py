@@ -4,7 +4,6 @@
 import rclpy
 from rclpy.node import Node
 from nav_msgs.msg import Odometry
-import tf2_ros
 from tf_transformations import euler_from_quaternion
 import numpy as np
 
