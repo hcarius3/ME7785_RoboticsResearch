@@ -43,16 +43,19 @@ class print_transformed_odom(Node):
             self.Init = False
             self.Init_ang = orientation
             self.globalAng = self.Init_ang
-            Mrot = np.matrix([[np.cos(self.Init_ang), np.sin(self.Init_ang)],[-np.sin(self.Init_ang), np.cos(self.Init_ang)]])        
-            self.Init_pos.x = Mrot.item((0,0))*position.x + Mrot.item((0,1))*position.y
-            self.Init_pos.y = Mrot.item((1,0))*position.x + Mrot.item((1,1))*position.y
+            self.Mrot = np.matrix([[np.cos(self.Init_ang), np.sin(self.Init_ang)],[-np.sin(self.Init_ang), np.cos(self.Init_ang)]])        
+            self.Init_pos.x = self.Mrot.item((0,0))*position.x + self.Mrot.item((0,1))*position.y
+            self.Init_pos.y = self.Mrot.item((1,0))*position.x + self.Mrot.item((1,1))*position.y
             self.Init_pos.z = position.z
-        Mrot = np.matrix([[np.cos(self.Init_ang), np.sin(self.Init_ang)],[-np.sin(self.Init_ang), np.cos(self.Init_ang)]])        
+        # self.Mrot = np.matrix([[np.cos(self.Init_ang), np.sin(self.Init_ang)],[-np.sin(self.Init_ang), np.cos(self.Init_ang)]])        
 
         #We subtract the initial values
-        self.globalPos.x = Mrot.item((0,0))*position.x + Mrot.item((0,1))*position.y - self.Init_pos.x
-        self.globalPos.y = Mrot.item((1,0))*position.x + Mrot.item((1,1))*position.y - self.Init_pos.y
+        self.globalPos.x = self.Mrot.item((0,0))*position.x + self.Mrot.item((0,1))*position.y - self.Init_pos.x
+        self.globalPos.y = self.Mrot.item((1,0))*position.x + self.Mrot.item((1,1))*position.y - self.Init_pos.y
         self.globalAng = orientation - self.Init_ang
+
+        if self.globalAng <0:
+            self.globalAng += 2*math.pi
     
         self.get_logger().info('Transformed global pose is x:{}, y:{}, a:{}'.format(self.globalPos.x,self.globalPos.y,self.globalAng))
     
