@@ -12,16 +12,18 @@ import os
 
 # Helper class for PID controller
 class PIDController:
-    def __init__(self, kp, ki, kd):
+    def __init__(self, kp, ki, kd, max_integral=1.0):
         self.kp = kp
         self.ki = ki
         self.kd = kd
         self.prev_error = 0.0
         self.integral = 0.0
+        self.max_integral = max_integral  # Prevents integral windup
 
     def compute(self, error, dt):
         """Compute the PID output"""
         self.integral += error * dt
+        self.integral = np.clip(self.integral, -self.max_integral, self.max_integral)
         derivative = (error - self.prev_error) / dt if dt > 0 else 0.0
         output = self.kp * error + self.ki * self.integral + self.kd * derivative
         self.prev_error = error
@@ -31,7 +33,7 @@ class PIDController:
 class GoToGoal(Node):
     def __init__(self):
         super().__init__('go_to_goal')
-        self.subscription = self.create_subscription(Odometry, '/odom', self.odom_callback, 10)
+        self.subscription = self.create_subscription(Odometry, '/odom', self.update_Odometry, 10)
         self.publisher = self.create_publisher(Twist, '/cmd_vel', 10)
         # self.subscription  # subscribe to getObjectRange later
 
@@ -88,8 +90,12 @@ class GoToGoal(Node):
         # We subtract the initial values
         self.globalPos.x = Mrot.item((0,0))*position.x + Mrot.item((0,1))*position.y - self.Init_pos.x
         self.globalPos.y = Mrot.item((1,0))*position.x + Mrot.item((1,1))*position.y - self.Init_pos.y
-        self.globalAng = orientation - self.Init_ang
+        self.globalAng = self.normalize_angle(orientation - self.Init_ang)
     
+    # Normalize angle to range [-pi, pi]
+    def normalize_angle(angle):
+        return (angle + np.pi) % (2 * np.pi) - np.pi
+
     def control_loop(self):
         # Stop after last waypoint got reached
         if self.current_goal_index >= len(self.waypoints):
@@ -106,28 +112,29 @@ class GoToGoal(Node):
         vector_to_goal = goal - self.current_position
         distance = np.linalg.norm(vector_to_goal)
         desired_angle = np.arctan2(vector_to_goal[1], vector_to_goal[0])
-        angle_error = desired_angle - self.current_yaw
+        angle_error = self.normalize_angle(desired_angle - self.globalAng)
         
-        # Rotate until aligned with goal. Only then drive forward
+        # Compute PID outputs
+        linear_vel = self.linear_pid.compute(distance, dt)
+        angular_vel = self.angular_pid.compute(angle_error, dt)
+        
+        # Rotate until aligned with goal. Then drive forward
         twist = Twist()
-        if abs(angle_error) > 0.1:
-            # Stop linear movement and rotate
+        if abs(angle_error) > 0.4:
+            # Stop linear movement and only rotate
             twist.linear.x = 0
-            # Compute PID output
-            angular_vel = self.angular_pid.compute(angle_error, dt)
             twist.angular.z = min(max(angular_vel, -self.limit_angular), self.limit_angular)
         else:
-            # Stop rotating
-            twist.angular.z = 0
             # Drive towards goal
-            linear_vel = self.linear_pid.compute(distance, dt)
-            twist.linear.z = min(max(linear_vel, -self.limit_linear), self.limit_linear)
+            twist.linear.z = min(linear_vel, self.limit_linear)
+            twist.angular.z = min(max(angular_vel, -self.limit_angular), self.limit_angular)
         
         if distance < 0.01: # in m
             # Stop movement
             twist.linear.x = 0
-            twist.angular.z = 0#
-            # Log and sleep
+            twist.angular.z = 0
+            self.publisher.publish(twist)
+            # Log and wait
             self.get_logger().info(f'Goal {self.current_goal_index} reached. Waiting 10s...')
             time.sleep(10)
             self.current_goal_index += 1
