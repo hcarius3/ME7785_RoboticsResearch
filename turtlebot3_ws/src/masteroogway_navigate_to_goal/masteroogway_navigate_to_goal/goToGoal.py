@@ -3,11 +3,11 @@
 
 import rclpy
 from rclpy.node import Node
-from geometry_msgs.msg import Point
 from geometry_msgs.msg import Twist
-import time
-import math
+from nav_msgs.msg import Odometry
 import numpy as np
+import time
+import os
 
 # Helper class for PID controller
 class PIDController:
@@ -26,30 +26,80 @@ class PIDController:
         self.prev_error = error
         return output
 
+class GoToGoal(Node):
+    def __init__(self):
+        super().__init__('go_to_goal')
+        self.subscription = self.create_subscription(Odometry, '/odom', self.odom_callback, 10)
+        self.publisher = self.create_publisher(Twist, '/cmd_vel', 10)
+        self.subscription  # Prevent unused variable warning
+        
+        # Start position
+        self.current_position = np.array([0.0, 0.0])
+        self.current_yaw = 0.0
+        
+        # Init PID controllers
+        self.linear_pid = PIDController(1.0, 0.0, 0.1)
+        self.angular_pid = PIDController(2.0, 0.0, 0.2)
+        
+        # Velocity limits
+        self.limit_angular = 1.5 # in rad/s
+        self.limit_linear = 0.2 # in m/s
+        
+        # Read waypoint file
+        self.load_waypoints()
+        self.current_goal_index = 0
+        
+        # Timers
+        self.last_time = time.time()
+        self.timer = self.create_timer(0.1, self.control_loop)
+    
+    def load_waypoints(self):
+        waypoints_path = os.path.join(os.path.dirname(__file__), 'waypoints.txt')
+        with open(waypoints_path, 'r') as f:
+            self.waypoints = [list(map(float, line.strip().split())) for line in f.readlines()]
+    
+    def odom_callback(self, msg):
+        position = msg.pose.pose.position
+        q = msg.pose.pose.orientation
+        self.current_position = np.array([position.x, position.y])
+        self.current_yaw = np.arctan2(2*(q.w*q.z+q.x*q.y), 1-2*(q.y*q.y+q.z*q.z))
+    
+    def control_loop(self):
+        if self.current_goal_index >= len(self.waypoints):
+            self.get_logger().info('All waypoints reached!')
+            return
+        
+        current_time = time.time()
+        dt = current_time - self.last_time
+        self.last_time = current_time
+        
+        goal = np.array(self.waypoints[self.current_goal_index])
+        vector_to_goal = goal - self.current_position
+        distance = np.linalg.norm(vector_to_goal)
+        desired_angle = np.arctan2(vector_to_goal[1], vector_to_goal[0])
+        angle_error = desired_angle - self.current_yaw
+        
+        linear_speed = self.linear_pid.compute(distance, dt)
+        angular_speed = self.angular_pid.compute(angle_error, dt)
+        
+        twist = Twist()
+        twist.linear.x = min(linear_speed, 0.2)
+        twist.angular.z = min(max(angular_speed, -1.5), 1.5)
+        self.publisher.publish(twist)
+        
+        if distance < 0.01:
+            self.get_logger().info(f'Goal {self.current_goal_index} reached. Waiting 10s...')
+            time.sleep(10)
+            self.current_goal_index += 1
+
+
 class ChaseObject(Node):
     def __init__(self):
         super().__init__('chase_object')
         
-        # Subscribe to object position data
-        self.subscription = self.create_subscription(Point, '/obj_position', self.object_callback, 10)
         
-        # Publisher for velocity commands
-        self.publisher = self.create_publisher(Twist, '/cmd_vel', 10)
-
-        # PID controllers
-        # self.angular_pid = PIDController(kp=3, ki=0.1, kd=0.1)  # Adjust values as needed
-        self.angular_pid = PIDController(kp=3, ki=0.01, kd=0.01)
-        self.linear_pid = PIDController(kp=1.5, ki=0.0, kd=0.0)
-
-        # Desired Position
-        self.target_angle = 0 # Desired angle from object in deg
-        self.tolerance_angle = 10 # +- angle tolerance in deg
-        self.target_distance = 0.5  # Desired distance from object in m
-        self.tolerance_distance = 0.05  # +- distance tolerance in m
         
-        # Velocity limits
-        self.limit_angular = 40 # in deg/s
-        self.limit_linear = 0.15 # in m/s
+        
 
         # Timer
         self.last_time = time.time()
