@@ -8,6 +8,7 @@ from geometry_msgs.msg import Twist
 from nav_msgs.msg import Odometry
 import numpy as np
 import time
+from ament_index_python.packages import get_package_share_directory
 import os
 
 # Helper class for PID controller
@@ -39,15 +40,14 @@ class GoToGoal(Node):
 
         # Odom position
         self.Init = True
-        self.Init_pos = Point()
-        self.Init_pos.x = 0.0
-        self.Init_pos.y = 0.0
         self.Init_ang = 0.0
-        self.globalPos = Point()
+        self.Init_pos = np.zeros(2)
+        self.globalPos = np.zeros(2)
+        self.globalAng = 0.0
         
         # Init PID controllers
-        self.linear_pid = PIDController(1.0, 0.0, 0.1)
-        self.angular_pid = PIDController(2.0, 0.0, 0.2)
+        self.linear_pid = PIDController(0.8, 0.04, 0.5)
+        self.angular_pid = PIDController(1, 0.01, 0.8)
         
         # Velocity limits
         self.limit_angular = 1.5 # in rad/s
@@ -59,16 +59,22 @@ class GoToGoal(Node):
         
         # Timers
         self.last_time = time.time()
-        self.timer = self.create_timer(0.1, self.control_loop)
+        self.timer = self.create_timer(0.2, self.control_loop) # determines sampling rate of the controller too
     
     def load_waypoints(self):
-        # Adjust path to point to the correct location in the source directory
-        package_src_directory = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../../src/masteroogway_navigate_to_goal/masteroogway_navigate_to_goal/'))
-        waypoints_path = os.path.join(package_src_directory, 'waypoints.txt')
+        # Find the workspace root dynamically
+        workspace_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../../../../"))
+
+        # Construct the correct path within the workspace
+        package_src_directory = os.path.join(workspace_root, "src/masteroogway_navigate_to_goal/masteroogway_navigate_to_goal")
+        waypoints_path = os.path.join(package_src_directory, 'wayPoints.txt')
 
         with open(waypoints_path, 'r') as f:
             self.waypoints = [list(map(float, line.strip().split())) for line in f.readlines()]
-    
+
+        # Print the waypoints
+        self.get_logger().info(f'Loaded waypoints: {self.waypoints}')
+
     def update_Odometry(self, Odom):
         position = Odom.pose.pose.position
         
@@ -81,19 +87,25 @@ class GoToGoal(Node):
             self.Init = False
             self.Init_ang = orientation
             self.globalAng = self.Init_ang
-            Mrot = np.matrix([[np.cos(self.Init_ang), np.sin(self.Init_ang)],[-np.sin(self.Init_ang), np.cos(self.Init_ang)]])        
-            self.Init_pos.x = Mrot.item((0,0))*position.x + Mrot.item((0,1))*position.y
-            self.Init_pos.y = Mrot.item((1,0))*position.x + Mrot.item((1,1))*position.y
-            self.Init_pos.z = position.z
-        Mrot = np.matrix([[np.cos(self.Init_ang), np.sin(self.Init_ang)],[-np.sin(self.Init_ang), np.cos(self.Init_ang)]])        
+            self.Mrot = np.matrix([[np.cos(self.Init_ang), np.sin(self.Init_ang)], [-np.sin(self.Init_ang), np.cos(self.Init_ang)]])        
+            self.Init_pos = np.array([
+                self.Mrot.item((0,0))*position.x + self.Mrot.item((0,1))*position.y,
+                self.Mrot.item((1,0))*position.x + self.Mrot.item((1,1))*position.y
+            ])
 
         # We subtract the initial values
-        self.globalPos.x = Mrot.item((0,0))*position.x + Mrot.item((0,1))*position.y - self.Init_pos.x
-        self.globalPos.y = Mrot.item((1,0))*position.x + Mrot.item((1,1))*position.y - self.Init_pos.y
+        # Apply the transformation to correct odometry
+        self.globalPos = np.array([
+            self.Mrot.item((0,0))*position.x + self.Mrot.item((0,1))*position.y - self.Init_pos[0],
+            self.Mrot.item((1,0))*position.x + self.Mrot.item((1,1))*position.y - self.Init_pos[1]
+        ])
+        self.globalAng = orientation - self.Init_ang
         self.globalAng = self.normalize_angle(orientation - self.Init_ang)
+
+        # self.get_logger().info(f'Corrected Position: ({self.globalPos[0]:.2f}, {self.globalPos[1]:.2f}), Yaw: {self.globalAng:.2f} rad')
     
     # Normalize angle to range [-pi, pi]
-    def normalize_angle(angle):
+    def normalize_angle(self, angle):
         return (angle + np.pi) % (2 * np.pi) - np.pi
 
     def control_loop(self):
@@ -109,10 +121,18 @@ class GoToGoal(Node):
         
         # Set new goal
         goal = np.array(self.waypoints[self.current_goal_index])
-        vector_to_goal = goal - self.current_position
+        vector_to_goal = goal - self.globalPos
         distance = np.linalg.norm(vector_to_goal)
         desired_angle = np.arctan2(vector_to_goal[1], vector_to_goal[0])
+        # angle_error = desired_angle - self.globalAng
         angle_error = self.normalize_angle(desired_angle - self.globalAng)
+
+        # Print values
+        # self.get_logger().info(f'Current Goal: {goal}')
+        # self.get_logger().info(f'Vector to Goal: {vector_to_goal}')
+        self.get_logger().info(f'Distance to Goal: {distance:.4f}')
+        # self.get_logger().info(f'Desired Angle: {desired_angle:.4f} rad')
+        self.get_logger().info(f'Angle Error: {angle_error:.4f} rad')
         
         # Compute PID outputs
         linear_vel = self.linear_pid.compute(distance, dt)
@@ -122,23 +142,27 @@ class GoToGoal(Node):
         twist = Twist()
         if abs(angle_error) > 0.4:
             # Stop linear movement and only rotate
-            twist.linear.x = 0
+            self.get_logger().info('Rotate towards goal')
+            twist.linear.x = 0.0
             twist.angular.z = min(max(angular_vel, -self.limit_angular), self.limit_angular)
         else:
             # Drive towards goal
-            twist.linear.z = min(linear_vel, self.limit_linear)
+            self.get_logger().info('Drive towards goal')
+            twist.linear.x = min(linear_vel, self.limit_linear)
             twist.angular.z = min(max(angular_vel, -self.limit_angular), self.limit_angular)
         
         if distance < 0.01: # in m
             # Stop movement
-            twist.linear.x = 0
-            twist.angular.z = 0
+            twist.linear.x = 0.0
+            twist.angular.z = 0.0
             self.publisher.publish(twist)
             # Log and wait
             self.get_logger().info(f'Goal {self.current_goal_index} reached. Waiting 10s...')
-            time.sleep(10)
+            time.sleep(2)
+            # time.sleep(10)
             self.current_goal_index += 1
 
+        # self.get_logger().info(f'Publishing Velocity: linear {twist.linear.x}m/s, angular {twist.angular.z}rad/s')
         self.publisher.publish(twist)
 
 def main():
