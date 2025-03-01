@@ -4,10 +4,9 @@
 import rclpy
 from rclpy.node import Node
 from nav_msgs.msg import Odometry
-from tf_transformations import euler_from_quaternion
 import numpy as np
 
-class OdomListener(Node):
+class getRobotGlobalPos(Node):
     def __init__(self):
         super().__init__('odom_listener')
         self.subscription = self.create_subscription(
@@ -59,7 +58,7 @@ class OdomListener(Node):
 
 def main():
 	rclpy.init() # init routine needed for ROS2.
-	node = OdomListener() # Create class object to be used.
+	node = getRobotGlobalPos() # Create class object to be used.
 	try:
 		rclpy.spin(node) # Trigger callback processing.		
 	except SystemExit:

@@ -9,7 +9,7 @@ from rclpy.qos import qos_profile_sensor_data
 import time
 import math
 
-class GetObjectRange(Node):
+class detectObject(Node):
     def __init__(self):
         super().__init__('get_object_range')
 
@@ -92,7 +92,7 @@ class GetObjectRange(Node):
 
 def main():
 	rclpy.init() # init routine needed for ROS2.
-	node = GetObjectRange() # Create class object to be used.
+	node = detectObject() # Create class object to be used.
 	try:
 		rclpy.spin(node) # Trigger callback processing.		
 	except SystemExit:
