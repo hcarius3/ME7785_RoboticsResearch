@@ -24,7 +24,7 @@ setup(
     entry_points={
         'console_scripts': [
             'goToGoal = masteroogway_navigate_to_goal.goToGoal:main',
-            'detectObject = masteroogway_navigate_to_goal.detectObject:main',
+            'detectObstacle = masteroogway_navigate_to_goal.detectObstacle:main',
             'getRobotGlobalPos = masteroogway_navigate_to_goal.getRobotGlobalPos:main',
             'planPath = masteroogway_navigate_to_goal.planPath:main',
         ],
