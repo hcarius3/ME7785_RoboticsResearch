@@ -4,23 +4,22 @@
 import rclpy
 from rclpy.node import Node
 from geometry_msgs.msg import Point
+from masteroogway_navigate_to_goal.msg import ObstacleArray
 from sensor_msgs.msg import LaserScan
 from rclpy.qos import qos_profile_sensor_data
 import time
 import math
 
-class detectObject(Node):
+class detectObstacle(Node):
     def __init__(self):
         super().__init__('get_object_range')
-
-        # Subscribe to object coordinates (angle from camera)
-        self.subscription_camera = self.create_subscription(Point, '/obj_angle', self.object_callback, 10)
 
         # Subscribe to LiDAR scan
         self.subscription_lidar = self.create_subscription(LaserScan, '/scan', self.lidar_callback, qos_profile_sensor_data)
 
-        # Publisher for object position with distance
-        self.publisher = self.create_publisher(Point, '/obj_position', 10)
+        # Publisher for a list of objects including all corner points
+        self.publisher = self.create_publisher(ObstacleArray, '/obstacles', 10)
+        self.timer = self.create_timer(2.0, self.publish_obstacles)
 
         # Initialize variables
         self.obj_angle = None
@@ -30,6 +29,27 @@ class detectObject(Node):
         self.last_time = time.time()
 
         self.get_logger().info("Get Object Range Node Initialized")
+
+    # Temp test function which publishes set obstacles
+    def publish_obstacles(self):
+        msg = ObstacleArray()
+        
+        # Example obstacles
+        obstacles = [
+            [(0, 0), (2, 1)],         # 2-point obstacle (line segment)
+            [(1, 2), (3, 0), (4, 2)]  # 3-point obstacle (triangle)
+        ]
+        
+        for obstacle in obstacles:
+            obstacle_msg = []
+            for x, y in obstacle:
+                p = Point()
+                p.x, p.y = x, y
+                obstacle_msg.append(p)
+            msg.obstacles.append(obstacle_msg)
+
+        self.publisher.publish(msg)
+        self.get_logger().info("Published Obstacles")
 
     def object_callback(self, msg):
         """Receive object angle from detect_object node."""
@@ -92,7 +112,7 @@ class detectObject(Node):
 
 def main():
 	rclpy.init() # init routine needed for ROS2.
-	node = detectObject() # Create class object to be used.
+	node = detectObstacle() # Create class object to be used.
 	try:
 		rclpy.spin(node) # Trigger callback processing.		
 	except SystemExit:
