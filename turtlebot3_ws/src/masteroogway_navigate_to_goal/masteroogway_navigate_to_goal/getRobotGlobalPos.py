@@ -12,10 +12,10 @@ class getRobotGlobalPos(Node):
         super().__init__('odom_listener')
 
         # Subscribe to odom message
-        self.subscription = self.create_subscription(Odometry, '/odom', self.update_Odometry, 10)
+        self.subscriber_odom = self.create_subscription(Odometry, '/odom', self.update_Odometry, 10)
         
         # Publish the global position of the robot
-        self.publisher = self.create_publisher(Pose, '/rob_pose', 10)
+        self.publisher_rob_pose = self.create_publisher(Pose, '/rob_pose', 10)
         
         # Initialization variables
         self.Init = True
@@ -27,6 +27,7 @@ class getRobotGlobalPos(Node):
         self.globalAng = 0.0        
 
     def update_Odometry(self, Odom):
+        # Read position
         position = Odom.pose.pose.position
         
         # Extract yaw from quaternion
@@ -53,7 +54,31 @@ class getRobotGlobalPos(Node):
         # Normalize angle to range [-pi, pi]
         self.globalAng = (self.globalAng + np.pi) % (2 * np.pi) - np.pi
 
+        # Publish and log
+        self.publish_pose()
         self.get_logger().info(f'Corrected Position: ({self.globalPos.x:.2f}, {self.globalPos.y:.2f})m, Yaw: {self.globalAng:.2f}rad')
+    
+    def publish_pose(self):
+        msg = Pose()
+
+        # Position
+        msg.position.x = self.globalPos.x
+        msg.position.y = self.globalPos.y
+
+        # Convert yaw angle to quaternion
+        q = self.euler_to_quaternion(self.globalAng)
+        msg.orientation.x, msg.orientation.y, msg.orientation.z, msg.orientation.w = q
+
+        # Publish
+        self.publisher_rob_pose.publish(msg)
+
+    def euler_to_quaternion(self, yaw):
+        # Simpler because we only have yaw angle
+        qw = np.cos(yaw * 0.5)
+        qx = 0.0
+        qy = 0.0
+        qz = np.sin(yaw * 0.5)
+        return [qx, qy, qz, qw]
 
 def main():
 	rclpy.init() # init routine needed for ROS2.
