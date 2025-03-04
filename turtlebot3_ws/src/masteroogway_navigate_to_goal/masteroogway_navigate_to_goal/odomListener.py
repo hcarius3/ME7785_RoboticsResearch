@@ -4,18 +4,12 @@
 import rclpy
 from rclpy.node import Node
 from nav_msgs.msg import Odometry
-from tf_transformations import euler_from_quaternion
 import numpy as np
 
 class OdomListener(Node):
     def __init__(self):
         super().__init__('odom_listener')
-        self.subscription = self.create_subscription(
-            Odometry,
-            '/odom',
-            self.update_Odometry,
-            10
-        )
+        self.subscription = self.create_subscription(Odometry, '/odom', self.update_Odometry, 10)
         self.subscription  # Prevent unused variable warning
         
         # Initialization variables
