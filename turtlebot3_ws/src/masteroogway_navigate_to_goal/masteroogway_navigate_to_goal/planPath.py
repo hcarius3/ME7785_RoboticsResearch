@@ -6,7 +6,7 @@ from rclpy.node import Node
 from geometry_msgs.msg import Pose
 from nav_msgs.msg import Path
 from shapely.geometry import LineString, Polygon
-from masteroogway_navigate_to_goal.msg import ObstacleArray
+from custom_interfaces.msg import ObstacleArray
 from itertools import combinations
 import networkx as nx
 import os
@@ -66,7 +66,7 @@ class planPath(Node):
         self.obstacles.clear()
         self.obstacles_expanded.clear()
         for obstacle in msg.obstacles:
-            points = [(p.x, p.y) for p in obstacle]             
+            points = [(p.x, p.y) for p in obstacle.points]             
 
             if len(points) == 2:  # No polygon, just a line
                 (x1, y1), (x2, y2) = points
