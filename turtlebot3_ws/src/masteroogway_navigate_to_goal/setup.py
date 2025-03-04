@@ -27,6 +27,7 @@ setup(
             'getRobotGlobalPos = masteroogway_navigate_to_goal.getRobotGlobalPos:main',
             'planPath = masteroogway_navigate_to_goal.planPath:main',
             'odomListener = masteroogway_navigate_to_goal.odomListener:main',
+            'testObstaclePublisher = masteroogway_navigate_to_goal.test_obstacle_publisher:main',
         ],
     },
 )
