@@ -3,7 +3,7 @@
  
 import rclpy
 from rclpy.node import Node
-from geometry_msgs.msg import Pose
+from geometry_msgs.msg import Pose, PoseStamped
 from nav_msgs.msg import Path
 from shapely.geometry import LineString, Polygon
 from custom_interfaces.msg import ObstacleArray
@@ -30,7 +30,7 @@ class planPath(Node):
         self.goal = None
         self.obstacles = []
         self.obstacles_expanded = []
-        self.new_path_required = False
+        self.new_path_required = True
         self.waypoints = []
         self.current_waypoint_index = 0
         self.waiting = False
@@ -54,6 +54,7 @@ class planPath(Node):
     
     def pose_callback(self, msg):
         """ Updates robot's position """
+        # self.get_logger().info("Received new Robot Pose")
         self.robot_pose = np.array([msg.position.x, msg.position.y])
         self.try_reach_waypoint()
 
@@ -101,6 +102,7 @@ class planPath(Node):
     def try_reach_waypoint(self):
         """ Moves to each waypoint sequentially, waiting 10s at each """
         if self.robot_pose is None or not self.waypoints or self.waiting:
+            self.get_logger().info("No Robot Pose, waypoint or Robot is waiting")
             return
 
         if self.current_waypoint_index >= len(self.waypoints):
@@ -119,6 +121,7 @@ class planPath(Node):
             self.current_waypoint_index += 1
             self.waiting = False
             if self.current_waypoint_index < len(self.waypoints):
+                self.goal = np.array(self.waypoints[self.current_waypoint_index])
                 self.new_path_required = True
         
         if self.new_path_required:
@@ -126,25 +129,31 @@ class planPath(Node):
     
     def compute_path(self):
         """ Computes the shortest path using a Visibility Graph & A* """
-        if self.robot_pose is None or not self.obstacles_expanded or not self.new_path_required:
+        self.get_logger().info("Computing new path")
+
+        if self.robot_pose is None or not self.new_path_required:
             return
 
-        # Get all important points: Robot, Goal, expanded obstacle corners
-        points = [self.robot_pose, self.goal] + [np.array(corner) for obs in self.obstacles_expanded for corner in obs.exterior.coords[:-1]]
+        if not self.obstacles_expanded:
+            self.get_logger().info("No obstacles. Driving directly to the next waypoint")
+            self.publish_path([self.goal])
+        else:
+            # Get all important points: Robot, Goal, expanded obstacle corners
+            points = [self.robot_pose, self.goal] + [np.array(corner) for obs in self.obstacles_expanded for corner in obs.exterior.coords[:-1]]
 
-        # Create Visibility Graph
-        visibility_graph = nx.Graph()
-        for p1, p2 in combinations(points, 2):
-            if self.is_visible(p1, p2):
-                visibility_graph.add_edge(tuple(p1), tuple(p2), weight=np.linalg.norm(p1 - p2))
+            # Create Visibility Graph
+            visibility_graph = nx.Graph()
+            for p1, p2 in combinations(points, 2):
+                if self.is_visible(p1, p2):
+                    visibility_graph.add_edge(tuple(p1), tuple(p2), weight=np.linalg.norm(p1 - p2))
 
-        # Compute Shortest Path
-        robot_tuple = tuple(self.robot_pose)
-        goal_tuple = tuple(self.goal)
+            # Compute Shortest Path
+            robot_tuple = tuple(self.robot_pose)
+            goal_tuple = tuple(self.goal)
 
-        if robot_tuple in visibility_graph and goal_tuple in visibility_graph:
-            shortest_path = nx.astar_path(visibility_graph, robot_tuple, goal_tuple, weight='weight')
-            self.publish_path(shortest_path)
+            if robot_tuple in visibility_graph and goal_tuple in visibility_graph:
+                shortest_path = nx.astar_path(visibility_graph, robot_tuple, goal_tuple, weight='weight')
+                self.publish_path(shortest_path)
 
         # Path for the current obstacle setting got calculated
         self.new_path_required = False
@@ -158,11 +167,13 @@ class planPath(Node):
         """ Publishes computed path"""
         path_msg = Path()
         for pt in path_points:
-            pose_msg = Pose()
+            pose_msg = PoseStamped()
             pose_msg.pose.position.x, pose_msg.pose.position.y = pt
             path_msg.poses.append(pose_msg)
         self.path_pub.publish(path_msg)
-        self.get_logger().info(f"Published path with {len(path_points)} points.")
+        # self.get_logger().info(f"Published path with {len(path_points)} points.")
+        self.get_logger().info(f"Published Path Points: {[(pt[0], pt[1]) for pt in path_points]}")
+
 
 def main():
 	rclpy.init() # init routine needed for ROS2.
