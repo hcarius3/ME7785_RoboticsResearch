@@ -26,6 +26,7 @@ setup(
             'detectObstacle = masteroogway_navigate_to_goal.detectObstacle:main',
             'getRobotGlobalPos = masteroogway_navigate_to_goal.getRobotGlobalPos:main',
             'planPath = masteroogway_navigate_to_goal.planPath:main',
+            'odomListener = masteroogway_navigate_to_goal.odomListener:main',
         ],
     },
 )
