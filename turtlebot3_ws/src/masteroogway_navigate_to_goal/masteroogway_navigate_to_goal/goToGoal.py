@@ -3,13 +3,11 @@
 
 import rclpy
 from rclpy.node import Node
-from geometry_msgs.msg import Point
-from geometry_msgs.msg import Twist
-from nav_msgs.msg import Odometry
+from geometry_msgs.msg import Pose, Twist
+from nav_msgs.msg import Path
 import numpy as np
 import time
-from ament_index_python.packages import get_package_share_directory
-import os
+
 
 # Helper class for PID controller
 class PIDController:
@@ -34,16 +32,18 @@ class PIDController:
 class GoToGoal(Node):
     def __init__(self):
         super().__init__('go_to_goal')
-        self.subscription = self.create_subscription(Odometry, '/odom', self.update_Odometry, 10)
-        self.publisher = self.create_publisher(Twist, '/cmd_vel', 10)
-        # self.subscription  # subscribe to getObjectRange later
 
-        # Odom position
-        self.Init = True
-        self.Init_ang = 0.0
-        self.Init_pos = np.zeros(2)
+        # Subscribers
+        self.create_subscription(Pose, '/rob_pose', self.update_pose, 10)
+        self.create_subscription(Path, '/goal_path', self.update_path, 10)
+
+        # Publishers
+        self.vel_pub = self.create_publisher(Twist, '/cmd_vel', 10)
+
         self.globalPos = np.zeros(2)
         self.globalAng = 0.0
+        self.path = []
+        self.current_goal_index = 0
         
         # Init PID controllers
         self.linear_pid = PIDController(0.8, 0.04, 0.5)
@@ -53,56 +53,19 @@ class GoToGoal(Node):
         self.limit_angular = 1.5 # in rad/s
         self.limit_linear = 0.2 # in m/s
         
-        # Read waypoint file
-        self.load_waypoints()
-        self.current_goal_index = 0
-        
         # Timers
         self.last_time = time.time()
         self.timer = self.create_timer(0.2, self.control_loop) # determines sampling rate of the controller too
     
-    def load_waypoints(self):
-        # Find the workspace root dynamically
-        workspace_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../../../../"))
+    def update_pose(self, pose_msg):
+        self.globalPos = np.array([pose_msg.position.x, pose_msg.position.y])
+        q = pose_msg.orientation
+        self.globalAng = np.arctan2(2 * (q.w * q.z + q.x * q.y), 1 - 2 * (q.y * q.y + q.z * q.z))
 
-        # Construct the correct path within the workspace
-        package_src_directory = os.path.join(workspace_root, "src/masteroogway_navigate_to_goal/masteroogway_navigate_to_goal")
-        waypoints_path = os.path.join(package_src_directory, 'wayPoints.txt')
-
-        with open(waypoints_path, 'r') as f:
-            self.waypoints = [list(map(float, line.strip().split())) for line in f.readlines()]
-
-        # Print the waypoints
-        self.get_logger().info(f'Loaded waypoints: {self.waypoints}')
-
-    def update_Odometry(self, Odom):
-        position = Odom.pose.pose.position
-        
-        # Orientation uses the quaternion aprametrization.
-        # To get the angular position along the z-axis, the following equation is required.
-        q = Odom.pose.pose.orientation
-        orientation = np.arctan2(2*(q.w*q.z+q.x*q.y),1-2*(q.y*q.y+q.z*q.z))
-        if self.Init:
-            # The initial data is stored to by subtracted to all the other values as we want to start at position (0,0) and orientation 0
-            self.Init = False
-            self.Init_ang = orientation
-            self.globalAng = self.Init_ang
-            self.Mrot = np.matrix([[np.cos(self.Init_ang), np.sin(self.Init_ang)], [-np.sin(self.Init_ang), np.cos(self.Init_ang)]])        
-            self.Init_pos = np.array([
-                self.Mrot.item((0,0))*position.x + self.Mrot.item((0,1))*position.y,
-                self.Mrot.item((1,0))*position.x + self.Mrot.item((1,1))*position.y
-            ])
-
-        # We subtract the initial values
-        # Apply the transformation to correct odometry
-        self.globalPos = np.array([
-            self.Mrot.item((0,0))*position.x + self.Mrot.item((0,1))*position.y - self.Init_pos[0],
-            self.Mrot.item((1,0))*position.x + self.Mrot.item((1,1))*position.y - self.Init_pos[1]
-        ])
-        self.globalAng = orientation - self.Init_ang
-        self.globalAng = self.normalize_angle(orientation - self.Init_ang)
-
-        # self.get_logger().info(f'Corrected Position: ({self.globalPos[0]:.2f}, {self.globalPos[1]:.2f}), Yaw: {self.globalAng:.2f} rad')
+    def update_path(self, path_msg):
+        self.path = [(pose.pose.position.x, pose.pose.position.y) for pose in path_msg.poses]
+        self.current_goal_index = 0
+        self.get_logger().info(f'Received new path with {len(self.path)} points')
     
     # Normalize angle to range [-pi, pi]
     def normalize_angle(self, angle):
@@ -110,7 +73,7 @@ class GoToGoal(Node):
 
     def control_loop(self):
         # Stop after last waypoint got reached
-        if self.current_goal_index >= len(self.waypoints):
+        if self.current_goal_index >= len(self.path):
             self.get_logger().info('All waypoints reached!')
             return
         
@@ -157,13 +120,11 @@ class GoToGoal(Node):
             twist.angular.z = 0.0
             self.publisher.publish(twist)
             # Log and wait
-            self.get_logger().info(f'Goal {self.current_goal_index} reached. Waiting 10s...')
-            time.sleep(2)
-            # time.sleep(10)
+            self.get_logger().info(f'Point {self.current_goal_index} reached.')
             self.current_goal_index += 1
 
         # self.get_logger().info(f'Publishing Velocity: linear {twist.linear.x}m/s, angular {twist.angular.z}rad/s')
-        self.publisher.publish(twist)
+        self.vel_pub.publish(twist)
 
 def main():
 	rclpy.init() # init routine needed for ROS2.
