@@ -72,9 +72,9 @@ class GoToGoal(Node):
         return (angle + np.pi) % (2 * np.pi) - np.pi
 
     def control_loop(self):
-        # Stop after last waypoint got reached
+        # Stop after last point of the path got reached
         if self.current_goal_index >= len(self.path):
-            self.get_logger().info('All waypoints reached!')
+            self.get_logger().info('Path completed!')
             return
         
         # Update time
@@ -83,7 +83,7 @@ class GoToGoal(Node):
         self.last_time = current_time
         
         # Set new goal
-        goal = np.array(self.waypoints[self.current_goal_index])
+        goal = np.array(self.path[self.current_goal_index])
         vector_to_goal = goal - self.globalPos
         distance = np.linalg.norm(vector_to_goal)
         desired_angle = np.arctan2(vector_to_goal[1], vector_to_goal[0])
@@ -118,7 +118,7 @@ class GoToGoal(Node):
             # Stop movement
             twist.linear.x = 0.0
             twist.angular.z = 0.0
-            self.publisher.publish(twist)
+            self.vel_pub.publish(twist)
             # Log and wait
             self.get_logger().info(f'Point {self.current_goal_index} reached.')
             self.current_goal_index += 1
