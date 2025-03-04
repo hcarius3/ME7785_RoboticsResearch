@@ -20,11 +20,12 @@ class getRobotGlobalPos(Node):
         # Initialization variables
         self.Init = True
         self.Init_ang = 0.0
-        self.Init_pos = Point()
-        self.Init_pos.x = 0.0
-        self.Init_pos.y = 0.0
-        self.globalPos = self.Init_pos
-        self.globalAng = 0.0        
+        self.Init_pos = np.zeros(3)
+        self.globalPos = np.zeros(3)
+        self.globalAng = 0.0   
+
+        # Publishing timer
+        # self.timer = self.create_timer(0.2, self.publish_pose)
 
     def update_Odometry(self, Odom):
         # Read position
@@ -38,32 +39,42 @@ class getRobotGlobalPos(Node):
             self.Init = False
             self.Init_ang = orientation
             self.globalAng = self.Init_ang
-            self.Mrot = np.matrix([[np.cos(self.Init_ang), np.sin(self.Init_ang)], [-np.sin(self.Init_ang), np.cos(self.Init_ang)]])        
-            self.Init_pos.x = self.Mrot.item((0,0))*position.x + self.Mrot.item((0,1))*position.y
-            self.Init_pos.y = self.Mrot.item((1,0))*position.x + self.Mrot.item((1,1))*position.y
-            self.Init_pos.z = position.z
+
+            # Transformation matrix only calculated once
+            if abs(self.Init_ang) < 1e-6:
+                self.Init_ang = 0.0
+            self.Mrot = np.matrix([[np.cos(self.Init_ang), np.sin(self.Init_ang)], 
+                                   [-np.sin(self.Init_ang), np.cos(self.Init_ang)]])        
+            self.Init_pos = np.array([
+                self.Mrot.item((0,0)) * position.x + self.Mrot.item((0,1)) * position.y,
+                self.Mrot.item((1,0)) * position.x + self.Mrot.item((1,1)) * position.y,
+                position.z
+            ])
         
         # self.Mrot = np.matrix([[np.cos(self.Init_ang), np.sin(self.Init_ang)], [-np.sin(self.Init_ang), np.cos(self.Init_ang)]])        
         
         # Apply the transformation to correct odometry
-        self.globalPos.x = self.Mrot.item((0,0))*position.x + self.Mrot.item((0,1))*position.y - self.Init_pos.x
-        self.globalPos.y = self.Mrot.item((1,0))*position.x + self.Mrot.item((1,1))*position.y - self.Init_pos.y
-        # self.globalPos.z = position.z - self.Init_pos.z
+        self.globalPos = np.array([
+            self.Mrot.item((0,0)) * position.x + self.Mrot.item((0,1)) * position.y - self.Init_pos[0],
+            self.Mrot.item((1,0)) * position.x + self.Mrot.item((1,1)) * position.y - self.Init_pos[1],
+            position.z - self.Init_pos[2]
+        ])
         self.globalAng = orientation - self.Init_ang
 
         # Normalize angle to range [-pi, pi]
         self.globalAng = (self.globalAng + np.pi) % (2 * np.pi) - np.pi
 
         # Publish and log
-        self.publish_pose()
-        self.get_logger().info(f'Corrected Position: ({self.globalPos.x:.2f}, {self.globalPos.y:.2f})m, Yaw: {self.globalAng:.2f}rad')
+        self.publish_pose() # We use a timer instead to slow down
+        # self.get_logger().info(f'Corrected Position: ({self.globalPos[0]:.2f}, {self.globalPos[1]:.2f}), Yaw: {self.globalAng:.2f} rad')
     
     def publish_pose(self):
         msg = Pose()
 
         # Position
-        msg.position.x = self.globalPos.x
-        msg.position.y = self.globalPos.y
+        msg.position.x = self.globalPos[0]
+        msg.position.y = self.globalPos[1]
+        msg.position.z = self.globalPos[2]
 
         # Convert yaw angle to quaternion
         q = self.euler_to_quaternion(self.globalAng)
@@ -71,6 +82,7 @@ class getRobotGlobalPos(Node):
 
         # Publish
         self.publisher_rob_pose.publish(msg)
+        self.get_logger().info(f'Published: \n  - Position: ({msg.position.x:.2f}, {msg.position.y:.2f})m \n  - Yaw: {self.globalAng:.2f}rad')
 
     def euler_to_quaternion(self, yaw):
         # Simpler because we only have yaw angle
