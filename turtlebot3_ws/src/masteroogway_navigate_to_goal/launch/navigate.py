@@ -5,17 +5,17 @@ def generate_launch_description():
     return LaunchDescription([
         Node(
             package='masteroogway_navigate_to_goal',
-            executable='goToGoal',
+            executable='getRobotGlobalPos',
             output='screen'
         ),
         Node(
             package='masteroogway_navigate_to_goal',
-            executable='getObjectRange',
+            executable='detectObstacle',
             output='screen'
         ),
         Node(
             package='masteroogway_navigate_to_goal',
-            executable='detect_object',
+            executable='planPath',
             output='screen'
         ),
     ])
