@@ -92,7 +92,7 @@ class planPath(Node):
                 self.obstacles.append(geometry)
             
             # Expand obstacle
-            expanded_geometry = geometry.buffer(safetyDistance, cap_style=2, join_style=2, mitre_limit=1.5*safetyDistance)
+            expanded_geometry = geometry.buffer(safetyDistance, cap_style=2, join_style=2, mitre_limit=1.1)
             # expanded_geometry = geometry.buffer(safetyDistance, cap_style=3, join_style=2)
             
             # Store expanded obstacle

@@ -25,7 +25,7 @@ def expand_object(edges, safetyDistance):
     else:  # Otherwise, assume it's a polygon
         geometry = Polygon(edges)
     
-    expanded_geometry = geometry.buffer(safetyDistance, cap_style=2, join_style=2, mitre_limit=1.5*safetyDistance)
+    expanded_geometry = geometry.buffer(safetyDistance, cap_style=3, join_style=2, mitre_limit=1.1)
     # expanded_geometry = geometry.buffer(safetyDistance, cap_style=3, join_style=2)
     return expanded_geometry
 
@@ -54,9 +54,10 @@ def visualize_expansion(original_edges, expanded_shape):
 
 # Example usage
 # edges = [(0, 0), (4, 0), (4, 3), (0, 3)]  # Rectangle
-edges = [(0, 0), (4, 0), (4, 2)]  # Triangle
+edges = [(0.895, 1.51), (0.995, 1.43), (0.77, 1.19)]  # Triangle
+# edges = [(0, 0), (2, 1), (2, 4)]  # Triangle
 # edges = [(0, 0), (4, 1)]  # Try this for a two-point object (line segment)
-safetyDistance = 1
+safetyDistance = 0.15
 
 expanded_shape = expand_object(edges, safetyDistance)
 expanded_coords = list(expanded_shape.exterior.coords)
