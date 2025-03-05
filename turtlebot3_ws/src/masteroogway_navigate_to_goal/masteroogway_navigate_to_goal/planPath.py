@@ -12,7 +12,7 @@ import networkx as nx
 import os
 import numpy as np
 import time
-
+import matplotlib.pyplot as plt
 
 class planPath(Node):
     def __init__(self):
@@ -61,7 +61,7 @@ class planPath(Node):
     def obstacle_callback(self, msg):
         """ Receives obstacles, expands them and stores them as polygons """
         # Set safety distance to obstacle
-        safetyDistance = 0.3 # [m]
+        safetyDistance = 0.15 # [m]
 
         # Reset obstacles before updating
         self.obstacles.clear()
@@ -71,6 +71,10 @@ class planPath(Node):
 
             if len(points) == 2:  # No polygon, just a line
                 (x1, y1), (x2, y2) = points
+
+                # Store original obstacle
+                geometry = LineString([(x1, y1), (x2, y2)])
+                self.obstacles.append(geometry)
                 
                 # Compute direction vector
                 dx, dy = x2 - x1, y2 - y1
@@ -85,13 +89,13 @@ class planPath(Node):
                 
             else: # It's an actual polygon
                 geometry = Polygon(points)
+                self.obstacles.append(geometry)
             
             # Expand obstacle
             expanded_geometry = geometry.buffer(safetyDistance, cap_style=2, join_style=2, mitre_limit=1.5*safetyDistance)
             # expanded_geometry = geometry.buffer(safetyDistance, cap_style=3, join_style=2)
             
-            # Store original and expanded obstacle
-            self.obstacles.append(geometry)
+            # Store expanded obstacle
             self.obstacles_expanded.append(expanded_geometry) 
             
         # New obstacle data means we have to recompute the path
@@ -132,27 +136,35 @@ class planPath(Node):
         self.get_logger().info("Computing new path")
 
         if self.robot_pose is None or not self.new_path_required:
+            self.get_logger().info("Aborting path planning.")
             return
 
         if not self.obstacles_expanded:
             self.get_logger().info("No obstacles. Driving directly to the next waypoint")
             self.publish_path([self.goal])
+        elif self.is_visible(self.robot_pose, self.goal):
+            self.get_logger().info("Direct path to the goal is not obstracted. Driving directly to the next waypoint")
+            self.publish_path([self.goal])
         else:
             # Get all important points: Robot, Goal, expanded obstacle corners
             points = [self.robot_pose, self.goal] + [np.array(corner) for obs in self.obstacles_expanded for corner in obs.exterior.coords[:-1]]
+            # self.get_logger().info(f"Points used for visibility graph: {points}")
 
             # Create Visibility Graph
             visibility_graph = nx.Graph()
             for p1, p2 in combinations(points, 2):
                 if self.is_visible(p1, p2):
                     visibility_graph.add_edge(tuple(p1), tuple(p2), weight=np.linalg.norm(p1 - p2))
+            self.get_logger().info("Visibility Graph created.")
+            # self.get_logger().info(f"Nodes in visibility graph: {list(visibility_graph.nodes)}")
+            self.draw_visibility_graph(visibility_graph)
 
             # Compute Shortest Path
             robot_tuple = tuple(self.robot_pose)
             goal_tuple = tuple(self.goal)
-
             if robot_tuple in visibility_graph and goal_tuple in visibility_graph:
                 shortest_path = nx.astar_path(visibility_graph, robot_tuple, goal_tuple, weight='weight')
+                self.get_logger().info("Shortest Path found.")
                 self.publish_path(shortest_path)
 
         # Path for the current obstacle setting got calculated
@@ -161,7 +173,8 @@ class planPath(Node):
     def is_visible(self, p1, p2):
         """ Checks if p1 and p2 have line-of-sight (not blocked by obstacles) """
         line = LineString([p1, p2])
-        return not any(line.intersects(obs) for obs in self.obstacles_expanded)
+        # Ignore touching but not intersecting cases
+        return not any(line.intersects(obs) and not line.touches(obs) for obs in self.obstacles_expanded)
 
     def publish_path(self, path_points):
         """ Publishes computed path"""
@@ -173,6 +186,47 @@ class planPath(Node):
         self.path_pub.publish(path_msg)
         # self.get_logger().info(f"Published path with {len(path_points)} points.")
         self.get_logger().info(f"Published Path Points: {[(pt[0], pt[1]) for pt in path_points]}")
+
+    def draw_visibility_graph(self,graph):
+        """Draws the visibility graph, obstacles, expanded obstacles, robot, and goal"""
+        plt.figure(figsize=(8, 8))
+
+        # Draw obstacles
+        for obs in self.obstacles:
+            if obs.geom_type == 'Polygon':
+                coords = np.array(obs.exterior.coords)
+                plt.fill(coords[:, 0], coords[:, 1], 'r', alpha=0.5, label="Obstacle" if 'Obstacle' not in plt.gca().get_legend_handles_labels()[1] else "")
+            elif obs.geom_type == 'LineString':
+                coords = np.array(obs.coords)
+                plt.plot(coords[:, 0], coords[:, 1], 'r-', linewidth=2, label="Obstacle" if 'Obstacle' not in plt.gca().get_legend_handles_labels()[1] else "")
+        # Draw expanded obstacles
+        for obs in self.obstacles_expanded:
+            coords = np.array(obs.exterior.coords)
+            plt.fill(coords[:, 0], coords[:, 1], 'orange', alpha=0.3, label="Expanded Obstacle" if 'Expanded Obstacle' not in plt.gca().get_legend_handles_labels()[1] else "")
+
+        # Draw visibility graph edges
+        for edge in graph.edges:
+            p1, p2 = edge
+            plt.plot([p1[0], p2[0]], [p1[1], p2[1]], 'g--', alpha=0.5)
+
+        # Draw visibility graph nodes (important points)
+        points = [self.robot_pose, self.goal] + [np.array(corner) for obs in self.obstacles_expanded for corner in obs.exterior.coords[:-1]]
+        for point in points:
+            plt.scatter(*point, color='blue', s=30, zorder=3)
+
+        # Draw robot position
+        plt.scatter(*self.robot_pose, color='cyan', s=100, edgecolors='black', label="Robot", zorder=4)
+
+        # Draw goal position
+        plt.scatter(*self.goal, color='magenta', s=100, edgecolors='black', label="Goal", zorder=4)
+
+        # Labels and legend
+        plt.xlabel("X Coordinate")
+        plt.ylabel("Y Coordinate")
+        plt.title("Visibility Graph with Obstacles")
+        plt.legend()
+        plt.grid(True)
+        plt.show()
 
 
 def main():
