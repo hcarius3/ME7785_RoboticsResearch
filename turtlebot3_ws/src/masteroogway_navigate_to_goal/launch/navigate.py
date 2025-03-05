@@ -6,7 +6,7 @@ def generate_launch_description():
         Node(
             package='masteroogway_navigate_to_goal',
             executable='getRobotGlobalPos',
-            output='screen'
+            output='none'
         ),
         Node(
             package='masteroogway_navigate_to_goal',
