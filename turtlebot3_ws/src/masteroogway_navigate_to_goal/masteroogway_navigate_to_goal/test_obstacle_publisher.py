@@ -30,7 +30,16 @@ class ObstaclePublisher(Node):
             Point(x=0.77, y=1.19, z=0.0)
         ]
 
-        msg.obstacles = [obstacle1, obstacle2]
+        obstacle3 = Obstacle()
+        obstacle3.points = [
+            Point(x=0.12, y=-0.1, z=0.0),
+            Point(x=0.12, y=0.1, z=0.0),
+            Point(x=0.2, y=0.1, z=0.0),
+            Point(x=0.2, y=-0.1, z=0.0)
+            
+        ]
+
+        msg.obstacles = [obstacle1, obstacle2, obstacle3]
 
         self.get_logger().info('Publishing obstacles...')
         self.publisher_.publish(msg)
