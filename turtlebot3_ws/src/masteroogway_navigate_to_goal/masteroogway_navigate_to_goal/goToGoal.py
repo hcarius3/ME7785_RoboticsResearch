@@ -47,7 +47,7 @@ class GoToGoal(Node):
         
         # Init PID controllers
         self.linear_pid = PIDController(0.8, 0.04, 0.5)
-        self.angular_pid = PIDController(1, 0.01, 0.8)
+        self.angular_pid = PIDController(0.5, 0.02, 0.3)
         
         # Velocity limits
         self.limit_angular = 1.5 # in rad/s
@@ -60,7 +60,7 @@ class GoToGoal(Node):
     def update_pose(self, pose_msg):
         self.globalPos = np.array([pose_msg.position.x, pose_msg.position.y])
         q = pose_msg.orientation
-        self.globalAng = np.arctan2(2 * (q.w * q.z + q.x * q.y), 1 - 2 * (q.y * q.y + q.z * q.z))
+        self.globalAng = np.arctan2(2*(q.w * q.z + q.x * q.y), 1 - 2*(q.y * q.y + q.z * q.z))
 
     def update_path(self, path_msg):
         self.path = [(pose.pose.position.x, pose.pose.position.y) for pose in path_msg.poses]
@@ -103,7 +103,7 @@ class GoToGoal(Node):
         
         # Rotate until aligned with goal. Then drive forward
         twist = Twist()
-        if abs(angle_error) > 0.4:
+        if abs(angle_error) > 0.3:
             # Stop linear movement and only rotate
             self.get_logger().info('Rotate towards goal')
             twist.linear.x = 0.0
@@ -114,7 +114,13 @@ class GoToGoal(Node):
             twist.linear.x = min(linear_vel, self.limit_linear)
             twist.angular.z = min(max(angular_vel, -self.limit_angular), self.limit_angular)
         
-        if distance < 0.01: # in m
+        # Have a different threshold depending if it's a path point or actual goal point (last one)
+        if self.current_goal_index == len(self.path) - 1:
+            distance_threshold = 0.01
+        else:
+            distance_threshold = 0.02
+
+        if distance < distance_threshold: # in m
             # Stop movement
             twist.linear.x = 0.0
             twist.angular.z = 0.0
