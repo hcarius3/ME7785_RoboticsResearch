@@ -5,7 +5,7 @@ import rclpy
 from rclpy.node import Node
 from geometry_msgs.msg import Pose, PoseStamped
 from nav_msgs.msg import Path
-from shapely.geometry import LineString, Polygon
+from shapely.geometry import Point as ShapelyPoint, LineString, Polygon
 from custom_interfaces.msg import ObstacleArray
 from itertools import combinations
 import networkx as nx
@@ -29,7 +29,8 @@ class planPath(Node):
         self.robot_pose = None
         self.goal = None
         self.obstacles = []
-        self.obstacles_expanded = []
+        self.obstacles_NoGoZone = []
+        self.obstacles_SafeZone = []
         self.new_path_required = True
         self.waypoints = []
         self.current_waypoint_index = 0
@@ -60,12 +61,14 @@ class planPath(Node):
 
     def obstacle_callback(self, msg):
         """ Receives obstacles, expands them and stores them as polygons """
-        # Set safety distance to obstacle
+        # Set distance to obstacle for the two zones
         safetyDistance = 0.15 # [m]
+        noGoDistance = 0.12 # [m]
 
         # Reset obstacles before updating
         self.obstacles.clear()
-        self.obstacles_expanded.clear()
+        self.obstacles_NoGoZone.clear()
+        self.obstacles_SafeZone.clear()
         for obstacle in msg.obstacles:
             points = [(p.x, p.y) for p in obstacle.points]             
 
@@ -92,11 +95,13 @@ class planPath(Node):
                 self.obstacles.append(geometry)
             
             # Expand obstacle
-            expanded_geometry = geometry.buffer(safetyDistance, cap_style=2, join_style=2, mitre_limit=1.1)
+            geometry_NoGoZone = geometry.buffer(noGoDistance, cap_style=2, join_style=2, mitre_limit=1.1)
+            geometry_SafeZone = geometry.buffer(safetyDistance, cap_style=2, join_style=2, mitre_limit=1.1)
             # expanded_geometry = geometry.buffer(safetyDistance, cap_style=3, join_style=2)
             
             # Store expanded obstacle
-            self.obstacles_expanded.append(expanded_geometry) 
+            self.obstacles_NoGoZone.append(geometry_NoGoZone)
+            self.obstacles_SafeZone.append(geometry_SafeZone)
             
         # New obstacle data means we have to recompute the path
         self.new_path_required = True
@@ -139,32 +144,51 @@ class planPath(Node):
             self.get_logger().info("Aborting path planning.")
             return
 
-        if not self.obstacles_expanded:
+        if not self.obstacles_SafeZone:
             self.get_logger().info("No obstacles. Driving directly to the next waypoint")
             self.publish_path([self.goal])
-        elif self.is_visible(self.robot_pose, self.goal, self.obstacles_expanded):
+        elif self.is_visible(self.robot_pose, self.goal, self.obstacles_SafeZone):
             self.get_logger().info("Direct path to the goal is not obstracted. Driving directly to the next waypoint")
             self.publish_path([self.goal])
         else:
-            # Get all important points: Robot, Goal, expanded obstacle corners
-            points = [self.robot_pose, self.goal] + [np.array(corner) for obs in self.obstacles_expanded for corner in obs.exterior.coords[:-1]]
+            # Get all important points: Robot, Goal, obstacle safe zone corners
+            points = [self.robot_pose, self.goal] + [np.array(corner) for obs in self.obstacles_SafeZone for corner in obs.exterior.coords[:-1]]
             # self.get_logger().info(f"Points used for visibility graph: {points}")
 
             # Create Visibility Graph
-            visibility_graph = nx.Graph()
-            for p1, p2 in combinations(points, 2):
-                if self.is_visible(p1, p2, self.obstacles_expanded):
-                    visibility_graph.add_edge(tuple(p1), tuple(p2), weight=np.linalg.norm(p1 - p2))
-            self.get_logger().info("Visibility Graph created.")
-            # self.get_logger().info(f"Nodes in visibility graph: {list(visibility_graph.nodes)}")
+            if any(ShapelyPoint(self.robot_pose).within(obs) for obs in self.obstacles_NoGoZone):
+            # If the robot is too close to an obstacle = inside the No-Go-Zone go to nearest corner of the safe zone
+                self.get_logger().info("Robot too close to obstacle. Go to nearest corner.")
+                nearest_corner = None
+                min_distance = float('inf')
+                for obs in self.obstacles_SafeZone:
+                    # Get the corner points of safe zones
+                    corners = list(obs.exterior.coords)[:-1]
+                    # Find the nearest corner
+                    for corner in corners:
+                        dist = np.linalg.norm(self.robot_pose - np.array(corner))
+                        if dist < min_distance:
+                            min_distance = dist
+                            nearest_corner = corner
+                # Publish 
+                self.publish_path([nearest_corner])
+            else:
+                visibility_graph = nx.Graph()
+                for p1, p2 in combinations(points, 2):
+                    if self.is_visible(p1, p2, self.obstacles_NoGoZone):
+                        visibility_graph.add_edge(tuple(p1), tuple(p2), weight=np.linalg.norm(p1 - p2))
+                self.get_logger().info("Visibility Graph created.")
+                self.get_logger().info(f"Nodes in visibility graph: {list(visibility_graph.nodes)}")
 
-            # Compute Shortest Path
-            robot_tuple = tuple(self.robot_pose)
-            goal_tuple = tuple(self.goal)
-            if robot_tuple in visibility_graph and goal_tuple in visibility_graph:
-                shortest_path = nx.astar_path(visibility_graph, robot_tuple, goal_tuple, weight='weight')
-                self.get_logger().info("Shortest Path found.")
-                self.publish_path(shortest_path)
+                # Compute Shortest Path
+                robot_tuple = tuple(self.robot_pose)
+                goal_tuple = tuple(self.goal)
+                if robot_tuple in visibility_graph and goal_tuple in visibility_graph:
+                    shortest_path = nx.astar_path(visibility_graph, robot_tuple, goal_tuple, weight='weight')
+                    self.get_logger().info("Shortest Path found.")
+                    self.publish_path(shortest_path)
+                else:
+                    self.get_logger().info("Robot Position or Goal are not in the Graph.")
 
         # Path for the current obstacle setting got calculated
         self.new_path_required = False
