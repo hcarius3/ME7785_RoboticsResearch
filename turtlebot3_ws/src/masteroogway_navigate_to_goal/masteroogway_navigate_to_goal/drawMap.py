@@ -20,6 +20,7 @@ class drawMap(Node):
 
         # Store
         self.robot_pose = np.array([0.0, 0.0])
+        self.path = None
         self.goal = None
         self.obstacles = []
         self.obstacles_expanded = []
@@ -78,8 +79,11 @@ class drawMap(Node):
             self.get_logger().warn("Received an empty path")
             return
 
+        # Store path points
+        self.path = [(pose.pose.position.x, pose.pose.position.y) for pose in msg.poses]
+
         # Get last point in path as goal
-        self.goal = np.array([msg.poses[-1].pose.position.x, msg.poses[-1].pose.position.y])
+        self.goal = np.array(self.path[-1])
         self.get_logger().info(f"Updated goal to: {self.goal}")
 
         # Recalculate visibility graph
@@ -150,6 +154,11 @@ class drawMap(Node):
             for edge in self.visibility_graph.edges:
                 p1, p2 = edge
                 self.ax.plot([p1[1], p2[1]], [p1[0], p2[0]], 'g--', alpha=0.5)  # Swap x and y
+        
+        # Draw path
+        if hasattr(self, 'path') and self.path:
+            path_coords = np.array(self.path)
+            plt.plot(path_coords[:, 1], path_coords[:, 0], 'b-', linewidth=2, label="Path")
 
         # Draw key points
         if hasattr(self, "robot_pose") and self.robot_pose is not None:
