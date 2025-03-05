@@ -28,6 +28,7 @@ setup(
             'planPath = masteroogway_navigate_to_goal.planPath:main',
             'odomListener = masteroogway_navigate_to_goal.odomListener:main',
             'testObstaclePublisher = masteroogway_navigate_to_goal.test_obstacle_publisher:main',
+            'drawMap = masteroogway_navigate_to_goal.drawMap:main',
         ],
     },
 )

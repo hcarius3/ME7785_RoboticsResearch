@@ -142,7 +142,7 @@ class planPath(Node):
         if not self.obstacles_expanded:
             self.get_logger().info("No obstacles. Driving directly to the next waypoint")
             self.publish_path([self.goal])
-        elif self.is_visible(self.robot_pose, self.goal):
+        elif self.is_visible(self.robot_pose, self.goal, self.obstacles_expanded):
             self.get_logger().info("Direct path to the goal is not obstracted. Driving directly to the next waypoint")
             self.publish_path([self.goal])
         else:
@@ -153,11 +153,10 @@ class planPath(Node):
             # Create Visibility Graph
             visibility_graph = nx.Graph()
             for p1, p2 in combinations(points, 2):
-                if self.is_visible(p1, p2):
+                if self.is_visible(p1, p2, self.obstacles_expanded):
                     visibility_graph.add_edge(tuple(p1), tuple(p2), weight=np.linalg.norm(p1 - p2))
             self.get_logger().info("Visibility Graph created.")
             # self.get_logger().info(f"Nodes in visibility graph: {list(visibility_graph.nodes)}")
-            # self.draw_visibility_graph(visibility_graph)
 
             # Compute Shortest Path
             robot_tuple = tuple(self.robot_pose)
@@ -170,11 +169,11 @@ class planPath(Node):
         # Path for the current obstacle setting got calculated
         self.new_path_required = False
 
-    def is_visible(self, p1, p2):
+    def is_visible(self, p1, p2, obstacles):
         """ Checks if p1 and p2 have line-of-sight (not blocked by obstacles) """
         line = LineString([p1, p2])
         # Ignore touching but not intersecting cases
-        return not any(line.intersects(obs) and not line.touches(obs) for obs in self.obstacles_expanded)
+        return not any(line.intersects(obs) and not line.touches(obs) for obs in obstacles)
 
     def publish_path(self, path_points):
         """ Publishes computed path"""
@@ -186,48 +185,6 @@ class planPath(Node):
         self.path_pub.publish(path_msg)
         # self.get_logger().info(f"Published path with {len(path_points)} points.")
         self.get_logger().info(f"Published Path Points: {[(pt[0], pt[1]) for pt in path_points]}")
-
-    def draw_visibility_graph(self,graph):
-        """Draws the visibility graph, obstacles, expanded obstacles, robot, and goal"""
-        plt.figure(figsize=(8, 8))
-
-        # Draw obstacles
-        for obs in self.obstacles:
-            if obs.geom_type == 'Polygon':
-                coords = np.array(obs.exterior.coords)
-                plt.fill(coords[:, 0], coords[:, 1], 'r', alpha=0.5, label="Obstacle" if 'Obstacle' not in plt.gca().get_legend_handles_labels()[1] else "")
-            elif obs.geom_type == 'LineString':
-                coords = np.array(obs.coords)
-                plt.plot(coords[:, 0], coords[:, 1], 'r-', linewidth=2, label="Obstacle" if 'Obstacle' not in plt.gca().get_legend_handles_labels()[1] else "")
-        # Draw expanded obstacles
-        for obs in self.obstacles_expanded:
-            coords = np.array(obs.exterior.coords)
-            plt.fill(coords[:, 0], coords[:, 1], 'orange', alpha=0.3, label="Expanded Obstacle" if 'Expanded Obstacle' not in plt.gca().get_legend_handles_labels()[1] else "")
-
-        # Draw visibility graph edges
-        for edge in graph.edges:
-            p1, p2 = edge
-            plt.plot([p1[0], p2[0]], [p1[1], p2[1]], 'g--', alpha=0.5)
-
-        # Draw visibility graph nodes (important points)
-        points = [self.robot_pose, self.goal] + [np.array(corner) for obs in self.obstacles_expanded for corner in obs.exterior.coords[:-1]]
-        for point in points:
-            plt.scatter(*point, color='blue', s=30, zorder=3)
-
-        # Draw robot position
-        plt.scatter(*self.robot_pose, color='cyan', s=100, edgecolors='black', label="Robot", zorder=4)
-
-        # Draw goal position
-        plt.scatter(*self.goal, color='magenta', s=100, edgecolors='black', label="Goal", zorder=4)
-
-        # Labels and legend
-        plt.xlabel("X Coordinate")
-        plt.ylabel("Y Coordinate")
-        plt.title("Visibility Graph with Obstacles")
-        plt.legend()
-        plt.grid(True)
-        plt.show()
-
 
 def main():
 	rclpy.init() # init routine needed for ROS2.
