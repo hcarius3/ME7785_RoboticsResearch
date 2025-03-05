@@ -157,7 +157,7 @@ class planPath(Node):
                     visibility_graph.add_edge(tuple(p1), tuple(p2), weight=np.linalg.norm(p1 - p2))
             self.get_logger().info("Visibility Graph created.")
             # self.get_logger().info(f"Nodes in visibility graph: {list(visibility_graph.nodes)}")
-            self.draw_visibility_graph(visibility_graph)
+            # self.draw_visibility_graph(visibility_graph)
 
             # Compute Shortest Path
             robot_tuple = tuple(self.robot_pose)
