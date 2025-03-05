@@ -62,7 +62,7 @@ class planPath(Node):
     def obstacle_callback(self, msg):
         """ Receives obstacles, expands them and stores them as polygons """
         # Set distance to obstacle for the two zones
-        safetyDistance = 0.15 # [m]
+        safetyDistance = 0.2 # [m]
         noGoDistance = 0.12 # [m]
 
         # Reset obstacles before updating
