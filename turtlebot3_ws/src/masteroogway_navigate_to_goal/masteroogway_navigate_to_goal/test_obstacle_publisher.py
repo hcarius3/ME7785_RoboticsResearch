@@ -39,7 +39,8 @@ class ObstaclePublisher(Node):
             
         ]
 
-        msg.obstacles = [obstacle1, obstacle2, obstacle3]
+        # msg.obstacles = [obstacle1, obstacle2, obstacle3]
+        msg.obstacles = [obstacle1, obstacle2]
 
         self.get_logger().info('Publishing obstacles...')
         self.publisher_.publish(msg)
