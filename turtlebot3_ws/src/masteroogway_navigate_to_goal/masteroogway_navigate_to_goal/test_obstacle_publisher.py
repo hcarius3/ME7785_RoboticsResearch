@@ -32,8 +32,8 @@ class ObstaclePublisher(Node):
 
         obstacle3 = Obstacle()
         obstacle3.points = [
-            Point(x=0.12, y=-0.1, z=0.0),
-            Point(x=0.12, y=0.1, z=0.0),
+            Point(x=0.13, y=-0.1, z=0.0),
+            Point(x=0.13, y=0.1, z=0.0),
             Point(x=0.2, y=0.1, z=0.0),
             Point(x=0.2, y=-0.1, z=0.0)
             
