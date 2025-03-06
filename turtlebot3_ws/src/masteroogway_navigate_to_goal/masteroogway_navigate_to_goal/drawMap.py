@@ -137,8 +137,8 @@ class drawMap(Node):
         self.ax.clear()  # Clear the previous plot but keep the figure open
 
         # Set axis limits with X+ pointing up and Y+ to the left
-        self.ax.set_xlim(1.8, -0.3)  
-        self.ax.set_ylim(-0.3, 1.8)
+        self.ax.set_xlim(2, -0.5)  
+        self.ax.set_ylim(-0.5, 2)
         self.ax.set_aspect('equal')
         self.ax.set_xlabel("Leftward (Y)")
         self.ax.set_ylabel("Forward (X)")
