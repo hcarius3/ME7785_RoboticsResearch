@@ -10,12 +10,7 @@ def generate_launch_description():
         ),
         Node(
             package='masteroogway_navigate_to_goal',
-            executable='detectObstacle',
-            output='screen'
-        ),
-        Node(
-            package='masteroogway_navigate_to_goal',
-            executable='planPath',
+            executable='goToGoal',
             output='screen'
         ),
     ])
