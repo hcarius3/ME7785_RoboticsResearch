@@ -46,8 +46,10 @@ class GoToGoal(Node):
         self.current_goal_index = 0
         
         # Init PID controllers
-        self.linear_pid = PIDController(0.8, 0.04, 0.5)
-        self.angular_pid = PIDController(0.5, 0.02, 0.3)
+        self.linear_pid = PIDController(0.08, 0.01, 0.005)
+        # self.linear_pid = PIDController(0.08, 0.01, 0.005) # slow as hell
+        self.angular_pid = PIDController(0.3, 0.05, 0.01)
+        # self.angular_pid = PIDController(0.3, 0.05, 0.01) # slow as hell
         
         # Velocity limits
         self.limit_angular = 1.5 # in rad/s
