@@ -46,10 +46,10 @@ class GoToGoal(Node):
         self.current_goal_index = 0
         
         # Init PID controllers
-        self.linear_pid = PIDController(0.08, 0.01, 0.005)
-        # self.linear_pid = PIDController(0.08, 0.01, 0.005) # slow as hell
-        self.angular_pid = PIDController(0.3, 0.05, 0.01)
-        # self.angular_pid = PIDController(0.3, 0.05, 0.01) # slow as hell
+        self.linear_pid = PIDController(0.15, 0.05, 0.01)
+        # self.linear_pid = PIDController(0.08, 0.01, 0.005) # slow as>
+        self.angular_pid = PIDController(0.4, 0.1, 0.02)
+        # self.angular_pid = PIDController(0.3, 0.05, 0.01) # slow as >
         
         # Velocity limits
         self.limit_angular = 1.5 # in rad/s
@@ -99,22 +99,26 @@ class GoToGoal(Node):
         # self.get_logger().info(f'Desired Angle: {desired_angle:.4f} rad')
         self.get_logger().info(f'Angle Error: {angle_error:.4f} rad')
         
-        # Compute PID outputs
-        linear_vel = self.linear_pid.compute(distance, dt)
-        angular_vel = self.angular_pid.compute(angle_error, dt)
-        
         # Rotate until aligned with goal. Then drive forward
         twist = Twist()
-        if abs(angle_error) > 0.3:
+        if abs(angle_error) > 0.4:
             # Stop linear movement and only rotate
             self.get_logger().info('Rotate towards goal')
+            # Only compute angular_vel
+            angular_vel = self.angular_pid.compute(angle_error, dt)
+            # Control velocities
             twist.linear.x = 0.0
             twist.angular.z = min(max(angular_vel, -self.limit_angular), self.limit_angular)
         else:
             # Drive towards goal
             self.get_logger().info('Drive towards goal')
+            # Compute PID outputs
+            linear_vel = self.linear_pid.compute(distance, dt)
+            angular_vel = self.angular_pid.compute(angle_error, dt)
+            # Control velocities
             twist.linear.x = min(linear_vel, self.limit_linear)
             twist.angular.z = min(max(angular_vel, -self.limit_angular), self.limit_angular)
+        
         
         # Have a different threshold depending if it's a path point or actual goal point (last one)
         if self.current_goal_index == len(self.path) - 1:
