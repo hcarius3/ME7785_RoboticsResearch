@@ -59,7 +59,7 @@ class PIDTuningNode(Node):
         distance = np.linalg.norm(vector_to_goal)
 
         # Switch to the next goal point if we are close enough to the goal
-        if distance <= 0.02 and self.current_goal_index < len(self.path):
+        if distance <= 0.02 and self.current_goal_index < len(self.path)-1:
             self.current_goal_index += 1
             goal = np.array(self.path[self.current_goal_index])
             vector_to_goal = goal - self.globalPos
