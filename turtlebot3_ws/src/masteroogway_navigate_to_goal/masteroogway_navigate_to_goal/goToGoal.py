@@ -48,7 +48,7 @@ class GoToGoal(Node):
         # Init PID controllers
         self.linear_pid = PIDController(0.15, 0.05, 0.01)
         # self.linear_pid = PIDController(0.08, 0.01, 0.005) # slow as>
-        self.angular_pid = PIDController(0.4, 0.1, 0.02)
+        self.angular_pid = PIDController(0.6, 0.05, 0.07)
         # self.angular_pid = PIDController(0.3, 0.05, 0.01) # slow as >
         
         # Velocity limits
