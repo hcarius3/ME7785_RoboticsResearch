@@ -85,23 +85,28 @@ class planPath(Node):
                 ux, uy = dx / length, dy / length  # Unit direction vector
                 
                 # Extend line endpoints
-                x1_ext, y1_ext = x1 - ux * safetyDistance, y1 - uy * safetyDistance
-                x2_ext, y2_ext = x2 + ux * safetyDistance, y2 + uy * safetyDistance
+                x1_NGZ, y1_NGZ = x1 - ux * noGoDistance, y1 - uy * noGoDistance
+                x2_NGZ, y2_NGZ = x2 + ux * noGoDistance, y2 + uy * noGoDistance
+                x1_SZ, y1_SZ = x1 - ux * safetyDistance, y1 - uy * safetyDistance
+                x2_SZ, y2_SZ = x2 + ux * safetyDistance, y2 + uy * safetyDistance
 
-                geometry = LineString([(x1_ext, y1_ext), (x2_ext, y2_ext)])
+                geometry_NoGoZone = LineString([(x1_NGZ, y1_NGZ), (x2_NGZ, y2_NGZ)])
+                geometry_SafeZone = LineString([(x1_SZ, y1_SZ), (x2_SZ, y2_SZ)])
+
+                 # Expand obstacle
+                geometry_NoGoZone = geometry_NoGoZone.buffer(noGoDistance, cap_style=2, join_style=2, mitre_limit=1.1)
+                geometry_SafeZone = geometry_SafeZone.buffer(safetyDistance, cap_style=2, join_style=2, mitre_limit=1.1)
                 
             else: # It's an actual polygon
                 geometry = Polygon(points)
                 self.obstacles.append(geometry)
-            
-            # Expand obstacle
-            geometry_NoGoZone = geometry.buffer(noGoDistance, cap_style=2, join_style=2, mitre_limit=1.1)
-            geometry_SafeZone = geometry.buffer(safetyDistance, cap_style=2, join_style=2, mitre_limit=1.1)
-            # expanded_geometry = geometry.buffer(safetyDistance, cap_style=3, join_style=2)
+                 # Expand obstacle
+                geometry_NoGoZone = geometry.buffer(noGoDistance, cap_style=2, join_style=2, mitre_limit=1.1)
+                geometry_SafeZone = geometry.buffer(safetyDistance, cap_style=2, join_style=2, mitre_limit=1.1)
             
             # Store expanded obstacle
             self.obstacles_NoGoZone.append(geometry_NoGoZone)
-            self.obstacles_SafeZone.append(geometry_SafeZone)
+            self.obstacles_SafeZone.append(geometry_SafeZone) 
             
         # New obstacle data means we have to recompute the path
         self.new_path_required = True
