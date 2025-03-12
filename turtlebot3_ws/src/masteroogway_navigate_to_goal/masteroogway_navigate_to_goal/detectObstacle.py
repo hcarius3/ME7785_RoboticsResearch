@@ -30,6 +30,9 @@ class DetectObstacle(Node):
         self.robot_y = 0.0
         self.robot_theta = 0.0  # Orientation
 
+        # Stored obstacles to avoid duplicate publishing
+        self.obstacles = set()
+
         self.get_logger().info("DetectObstacle Node Initialized")
 
     def pose_callback(self, msg):
@@ -44,27 +47,89 @@ class DetectObstacle(Node):
         cosy_cosp = 1 - 2 * (orientation.y * orientation.y + orientation.z * orientation.z)
         return math.atan2(siny_cosp, cosy_cosp)
 
+
     def lidar_callback(self, msg):
-        """Process LiDAR scan data to detect and publish obstacles in front of the robot."""
+        """Process LiDAR scan data to detect and publish only edge points of objects."""
         self.scan_counter += 1
         if self.scan_counter % self.scan_rate != 0:
             return  # Skip processing unless it's the designated scan
 
-        obstacles = []
         angle = msg.angle_min
-        front_angle_range = (-math.pi / 6, math.pi / 6)  # Define the field of view (e.g., ±30 degrees)
-        angle_tolerance = 0.1  # Angle threshold to merge obstacles
-        distance_tolerance = 0.2  # Distance threshold to merge obstacles
+        front_angle_range = (-math.pi / 6, math.pi / 6)  # ±30 degrees field of view
+        max_distance = 1.0  # Ignore obstacles beyond this distance
+        safety_distance = 0.0  # Enlargement factor for obstacles
+        cluster_tolerance = 0.1  # Maximum gap in meters to consider points connected
+        min_edge_dist = 0.05  # Minimum distance to consider a new edge unique
 
+        new_obstacles = set()
+        points = []  # Store (x, y) points for clustering
+
+        # Convert valid LiDAR points to Cartesian coordinates
         for i, distance in enumerate(msg.ranges):
-            if msg.range_min < distance < msg.range_max and front_angle_range[0] <= angle <= front_angle_range[1]:
-                relative_x = distance * math.cos(angle)  # Forward distance
-                relative_y = distance * math.sin(angle)  # Lateral offset
+            if msg.range_min < distance < max_distance and front_angle_range[0] <= angle <= front_angle_range[1]:
+                relative_x = distance * math.cos(angle)
+                relative_y = distance * math.sin(angle)
                 global_x, global_y = self.transform_to_global(relative_x, relative_y)
-                self.merge_obstacles(obstacles, global_x, global_y, angle, distance, angle_tolerance, distance_tolerance)
+                if (global_x < 2.0 and global_y < 2.0 and global_y > -0.5):
+                    points.append((global_x, global_y))
             angle += msg.angle_increment
+
+        # Sort points based on x-coordinates for easier line segmentation
+        points.sort()
+
+        # Group points into clusters based on proximity
+        clusters = []
+        current_cluster = []
         
-        self.publish_obstacles(obstacles)
+        for i in range(len(points)):
+            if not current_cluster:
+                current_cluster.append(points[i])
+                continue
+            
+            prev_x, prev_y = current_cluster[-1]
+            curr_x, curr_y = points[i]
+            
+            if math.hypot(curr_x - prev_x, curr_y - prev_y) < cluster_tolerance:
+                current_cluster.append(points[i])
+            else:
+                clusters.append(current_cluster)
+                current_cluster = [points[i]]
+
+        if current_cluster:
+            clusters.append(current_cluster)
+
+        # Identify edges: Start and end points of each detected cluster
+        detected_edges = set()
+        for cluster in clusters:
+            if len(cluster) >= 2:  # Ignore single points (noise)
+                detected_edges.add(tuple(cluster[0]))   # First point (left edge)
+                detected_edges.add(tuple(cluster[-1]))  # Last point (right edge)
+
+        # Merge with existing obstacles while keeping only new significant edges
+        for new_edge in detected_edges:
+            add_new = True
+            for existing in self.obstacles:
+                if math.hypot(new_edge[0] - existing[0], new_edge[1] - existing[1]) < min_edge_dist:
+                    add_new = False
+                    break
+            
+            if add_new:
+                new_obstacles.add(new_edge)
+        # **Remove obstacles that do not have at least one supporting neighbor**
+        valid_obstacles = set()
+        for obs in self.obstacles | new_obstacles:  # Combine old & new obstacles
+            neighbor_count = sum(
+                1 for other in (self.obstacles | new_obstacles) 
+                if obs != other and math.hypot(obs[0] - other[0], obs[1] - other[1]) < min_edge_dist
+            )
+            if neighbor_count >= 1:  # Keep only if it has at least one neighbor
+                valid_obstacles.add(obs)
+
+        # Update obstacle list and publish only if changes were detected
+        if new_obstacles:
+            self.obstacles.update(new_obstacles)  # Keep old and add selected new obstacles
+            self.publish_obstacles(self.obstacles, safety_distance)
+
 
     def transform_to_global(self, x, y):
         """Transform relative obstacle coordinates to global coordinates."""
@@ -72,29 +137,28 @@ class DetectObstacle(Node):
         global_y = self.robot_y + (x * math.sin(self.robot_theta) + y * math.cos(self.robot_theta))
         return global_x, global_y
 
-    def merge_obstacles(self, obstacles, x, y, angle, distance, angle_tol, dist_tol):
-        """Merge obstacles that are at similar angles and distances into a single middle point."""
-        for i, (ox, oy, o_angle, o_distance) in enumerate(obstacles):
-            if abs(angle - o_angle) < angle_tol and abs(distance - o_distance) < dist_tol:
-                # Compute middle point
-                obstacles[i] = ((ox + x) / 2, (oy + y) / 2, (o_angle + angle) / 2, (o_distance + distance) / 2)
-                return
-        obstacles.append((x, y, angle, distance))
-
-    def publish_obstacles(self, obstacles):
-        """Publish detected obstacles in ObstacleArray format."""
-        obstacle_array_msg = ObstacleArray()
-        for x, y, angle, distance in obstacles:
-            obstacle_msg = Obstacle()
-            point_msg = Point()
-            point_msg.x = x  # Global x position
-            point_msg.y = y  # Global y position
-            point_msg.z = angle  # Store relative angle
-            obstacle_msg.points.append(point_msg)  # Store single-point obstacle
-            obstacle_array_msg.obstacles.append(obstacle_msg)
+    def publish_obstacles(self, obstacles, safety_distance):
+        """Publish detected obstacles as enlarged versions in ObstacleArray format."""
+        if len(obstacles) < 2:
+            return  # Do not publish obstacles with less than 2 points
         
+        obstacle_array_msg = ObstacleArray()
+        obstacle_msg = Obstacle()
+        
+        enlarged_obstacles = set()
+        for (x, y) in obstacles:
+            expanded_x = x + math.copysign(safety_distance, x)
+            expanded_y = y + math.copysign(safety_distance, y)
+            enlarged_obstacles.add((expanded_x, expanded_y))
+            
+        for (x, y) in enlarged_obstacles:
+            point_msg = Point(x=x, y=y)
+            obstacle_msg.points.append(point_msg)
+            self.get_logger().info(f"Added enlarged point to obstacle: ({x}, {y})")
+        
+        obstacle_array_msg.obstacles.append(obstacle_msg)
         self.publisher.publish(obstacle_array_msg)
-        self.get_logger().info(f"Published {len(obstacle_array_msg.obstacles)} merged obstacles in ObstacleArray format")
+        self.get_logger().info(f"Published {len(obstacle_msg.points)} enlarged obstacle points in ObstacleArray format: {[(p.x, p.y) for p in obstacle_msg.points]}")
 
 
 def main():
