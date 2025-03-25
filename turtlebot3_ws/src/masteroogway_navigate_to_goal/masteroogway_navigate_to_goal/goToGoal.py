@@ -11,7 +11,7 @@ import time
 
 # Helper class for PID controller
 class PIDController:
-    def __init__(self, kp, ki, kd, max_integral=1.0):
+    def __init__(self, kp, ki, kd, max_integral=0.8):
         self.kp = kp
         self.ki = ki
         self.kd = kd
@@ -21,10 +21,10 @@ class PIDController:
 
     def compute(self, error, dt):
         """Compute the PID output"""
-        self.integral += error * dt
-        self.integral = np.clip(self.integral, -self.max_integral, self.max_integral)
-        derivative = (error - self.prev_error) / dt if dt > 0 else 0.0
-        output = self.kp * error + self.ki * self.integral + self.kd * derivative
+        #self.integral += error * dt
+        #self.integral = np.clip(self.integral, -self.max_integral, self.max_integral)
+        #derivative = (error - self.prev_error) / dt if dt > 0 else 0.0
+        output = self.kp * error + self.ki * self.integral + self.kd
         self.prev_error = error
         return output
 
@@ -46,14 +46,16 @@ class GoToGoal(Node):
         self.current_goal_index = 0
         
         # Init PID controllers
-        self.linear_pid = PIDController(0.15, 0.05, 0.01)
+        self.linear_pid = PIDController(0.12, 0.05, 0.04)
+        # self.linear_pid = PIDController(0.4, 0.0, 0.0)
         # self.linear_pid = PIDController(0.08, 0.01, 0.005) # slow as>
-        self.angular_pid = PIDController(0.6, 0.05, 0.07)
+        self.angular_pid = PIDController(0.4, 0.1, 0.02)
+        # self.angular_pid = PIDController(0.6, 0.0, 0.0)
         # self.angular_pid = PIDController(0.3, 0.05, 0.01) # slow as >
         
         # Velocity limits
         self.limit_angular = 1.5 # in rad/s
-        self.limit_linear = 0.2 # in m/s
+        self.limit_linear = 0.15 # in m/s
         
         # Timers
         self.last_time = time.time()
