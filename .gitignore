@@ -15,8 +15,8 @@ turtlebot3_ws/src/turtlebot3_msgs
 turtlebot3_ws/src/turtlebot3
 turtlebot3_ws/src/DynamixelSDK
 
-# Make sure the parameters for the navigation stack are included
-!turtlebot3_ws/src/turtlebot3/turtlebot3_navigation2/param/burger.yaml
+# Unignore the specific directory for navigation parameters
+!turtlebot3_ws/src/turtlebot3/turtlebot3_navigation2/
 
 # ROS 2 colcon build artifacts
 colcon_workspace/
