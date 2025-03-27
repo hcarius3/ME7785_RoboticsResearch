@@ -24,6 +24,9 @@ setup(
         'console_scripts': [
             'goToGoal = masteroogway_go_to_goal.goToGoal:main',
         ],
+        'console_scripts': [
+            'clickGoalPoints = masteroogway_go_to_goal.goToGoal_ClickGoals:main',
+        ],
     },
 )
 
