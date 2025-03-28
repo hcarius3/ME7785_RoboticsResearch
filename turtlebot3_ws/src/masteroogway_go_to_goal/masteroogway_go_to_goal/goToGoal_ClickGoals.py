@@ -22,7 +22,7 @@ class GoalPosePublisher(Node):
             PointStamped, '/clicked_point', self.point_callback, 10)
 
         # Settings
-        self.distance_threshold = 0.02  # [m]
+        self.distance_threshold = 0.1  # [m]
 
         # Variables
         self.goals = []
@@ -74,7 +74,7 @@ class GoalPosePublisher(Node):
         self.goal_reached = False
         
     def feedback_callback(self, msg):
-        if self.current_goal is None:
+        if self.current_goal is None or self.goal_reached:
             return  # No goal set yet
 
         # Extract robot position from feedback
@@ -89,6 +89,7 @@ class GoalPosePublisher(Node):
         if distance < self.distance_threshold:
             self.goal_reached = True
             self.get_logger().info(f'Goal reached! Remaining goals in queue: {len(self.goals)}')
+            time.sleep(5)
 
             # Publish the next goal
             self.publish_next_goal()
