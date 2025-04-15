@@ -21,7 +21,8 @@ setup(
     tests_require=['pytest'],
     entry_points={
         'console_scripts': [
-            'image_classifier = masteroogway_chase_object.image_classifier:main',
+            'image_classifier = masteroogway_final.image_classifier:main',
+            'maze_planner = masteroogway_final.maze_planner:main',
         ],
     },
 )
