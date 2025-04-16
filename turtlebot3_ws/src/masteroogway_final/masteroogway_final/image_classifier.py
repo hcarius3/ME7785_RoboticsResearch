@@ -54,6 +54,7 @@ class ImageClassifier(Node):
 
         self.get_logger().info("ResNet18 ONNX inference node initialized")
         self.publisher = self.create_publisher(Int32, '/sign_label', 10)
+        self.last_pred = None
 
     def preprocess_image(self, cv_image):
         img_resized = cv2.resize(cv_image, (self.img_size, self.img_size), interpolation=cv2.INTER_LINEAR)
@@ -76,19 +77,28 @@ class ImageClassifier(Node):
 
         if self.can_scan:
             # start timer
-            start_time = time.time()
+            # start_time = time.time()
             self.get_logger().info(f"Running resnet model wait here...")
             # Preprocess and run inference
             input_tensor = self.preprocess_image(cv_image)
             outputs = self.session.run(None, {"input": input_tensor})
             pred = int(np.argmax(outputs[0]))
 
-            end_time = time.time()
-            elapsed_ms = (end_time - start_time) * 1000
+            # end_time = time.time()
+            # elapsed_ms = (end_time - start_time) * 1000
 
-            # Log prediction and inference time
-            self.get_logger().info(f"Predicted class: {pred} | Inference time: {elapsed_ms:.2f} ms")
+            # Only publish if it's a new prediciton
+            # if self.last_pred != pred:
+            #     # Log prediction and inference time
+            #     self.get_logger().info(f"Predicted class: {pred}")
+            #     # self.get_logger().info(f"Predicted class: {pred} | Inference time: {elapsed_ms:.2f} ms")
+            #     self.publisher.publish(Int32(data=pred))
+
+            #     self.last_pred = pred
+        
+            self.get_logger().info(f"Predicted class: {pred}")
             self.publisher.publish(Int32(data=pred))
+
 
     def lidar_callback(self, msg):
         self.lidar_data = msg
@@ -143,7 +153,7 @@ class ImageClassifier(Node):
         left_dist /= self.lidar_spread
         right_dist /= self.lidar_spread
 
-        proximity_threshold = 0.5
+        proximity_threshold = 0.6
         flatness_threshold = 0.05
         corner_threshold = 0.3
 
@@ -154,12 +164,10 @@ class ImageClassifier(Node):
             if std_dev < flatness_threshold and not is_left_close and not is_right_close:
                 # self.get_logger().info(f"🚧 Close and Perpendicular to Flat Wall: front={front_dist:.2f}m, stddev={std_dev:.3f}, left={left_dist:.2f}, right={right_dist:.2f}")
                 self.can_scan = True
-            
             else:
                 self.can_scan = False
-            # else:
-            #     self.get_logger().info(f"📏 Close to Wall, Not Perpendicular: front={front_dist:.2f}, stddev={std_dev:.3f}, left={left_dist:.2f}, right={right_dist:.2f}")
-
+        else:
+            self.get_logger().info(f"Too far from wall: Distance {front_dist:.2f}")
 
 
 def main():
