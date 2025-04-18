@@ -3,10 +3,11 @@
 
 import rclpy
 from rclpy.node import Node
-from geometry_msgs.msg import PoseWithCovarianceStamped, PoseStamped
+from geometry_msgs.msg import PoseWithCovarianceStamped, PoseStamped, Twist
 from std_msgs.msg import Int32
 import matplotlib.pyplot as plt
 import math
+import time
 
 class Grid:
     def __init__(self, cell_size, width, height):
@@ -118,10 +119,11 @@ class MazePlanner(Node):
         self.init_maze()
 
         # Variables
+        self.angle_tolerance = 30  # degrees
         self.orientations = ['x_up', 'y_up', 'x_down', 'y_down']
         self.last_goal_cell = None
         self.last_goal_orientation = None
-
+        
         # Subscribe to AMCL pose
         self.pose_sub = self.create_subscription(PoseWithCovarianceStamped, '/amcl_pose', self.pose_callback, 10)
         # Subscribe to Image classification prediction
@@ -129,6 +131,13 @@ class MazePlanner(Node):
 
         # Publisher of goal position
         self.goal_pub = self.create_publisher(PoseStamped, '/goal_pose', 10)
+        # Publisher for robot velocity commands
+        self.publisher = self.create_publisher(Twist, '/cmd_vel', 10)
+
+        # Timer in case its stuck
+        self.timer = self.create_timer(1.0, self.check_idle_and_rotate)
+        self.last_movement_time = time.time()
+        self.idle_checker = False
         
         self.get_logger().info('Maze Planner node started.')
 
@@ -176,15 +185,30 @@ class MazePlanner(Node):
         self.current_yaw_deg = yaw_deg
         self.current_cell = cell
         self.current_orientation = orientation
+        self.last_movement_time = time.time()
+
+    def check_idle_and_rotate(self):
+        if not self.idle_checker:
+            return
+        
+        current_time = time.time()
+        if current_time - self.last_movement_time > 10:
+            self.get_logger().warn("Robot idle for over 10s. Publishing rotation command.")
+            twist = Twist()
+            twist.angular.z = 0.3  # Turn left
+            self.publisher.publish(twist)
+            self.last_movement_time = current_time
 
     def sign_callback(self, msg):
         if not hasattr(self, 'current_cell') or self.current_cell is None:
             self.get_logger().warn("No valid current cell. Ignoring command.")
             return
+        
+        # Only start checking for robot idle after receiving the first sign
+        self.idle_checker = True
 
-        tolerance = 20  # degrees
         valid_steps = [0, 90, 180, 270, 360]
-        if not any(abs(self.current_yaw_deg - step) <= tolerance for step in valid_steps):
+        if not any(abs(self.current_yaw_deg - step) <= self.angle_tolerance for step in valid_steps):
             self.get_logger().info("Not perpendicular to wall. Ignoring command.")
             return
 
@@ -212,6 +236,9 @@ class MazePlanner(Node):
         elif msg.data == 5:  # goal
             self.get_logger().info("Goal sign detected. Yay!")
             return
+        elif msg.data == 0: # Empty
+            # just ignore
+            return
         else:
             self.get_logger().warn(f"Unknown sign label: {msg.data}")
             return
@@ -222,11 +249,27 @@ class MazePlanner(Node):
 
         # Check if there's a wall right now in that orientation
         if self.grid.cells[grid_x][grid_y][new_orientation] == 1:
-            self.get_logger().info(f"Wall detected in {new_orientation}. Treat it as a turnaround.")
+            self.get_logger().info(f"Wall detected in {new_orientation}. Rotate on the spot.")
 
+            twist = Twist()
+            if msg.data == 1:
+                twist.angular.z = 0.3  # Turn left
+            elif msg.data == 2:
+                twist.angular.z = -0.3  # Turn right
+            else:
+                twist.angular.z = 0.0  # Stop rotating
+            self.publisher.publish(twist)
+
+            return
+            
             # This must mean we have to turn again in the same direction (turn around)
-            new_idx = (current_idx + 2) % 4
-            new_orientation = self.orientations[new_idx]
+            # new_idx = (current_idx + 2) % 4
+            # new_orientation = self.orientations[new_idx]
+        else:
+            # Stop rotation
+            twist = Twist()
+            twist.angular.z = 0.0
+            self.publisher.publish(twist)
 
         # Find goal
         dx, dy = {'x_up': (1, 0), 'x_down': (-1, 0), 'y_up': (0, 1), 'y_down': (0, -1)}[new_orientation]
