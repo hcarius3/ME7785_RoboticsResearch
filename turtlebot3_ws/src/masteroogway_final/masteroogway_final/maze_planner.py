@@ -13,12 +13,12 @@ class Grid:
         self.CELL_SIZE = cell_size
         self.GRID_WIDTH = width
         self.GRID_HEIGHT = height
-        # Lab
-        self.x_offset = -0.62
-        self.y_offset = -0.43
         # Gazebo
-        # self.x_offset = -0.46
-        # self.y_offset = -0.4
+        # self.x_offset = -0.62
+        # self.y_offset = -0.43
+        # Lab
+        self.x_offset = -0.45 # [-0.45, 5.0]
+        self.y_offset = -0.4 # [-0.4, 2.3]
 
         self.cells = [
             [
@@ -113,7 +113,8 @@ class MazePlanner(Node):
         super().__init__('maze_planner')
 
         # Initialize grid
-        self.grid = Grid(cell_size=0.92, width=6, height=3)
+        self.grid = Grid(cell_size=0.90, width=6, height=3)
+        # self.grid = Grid(cell_size=0.92, width=6, height=3)
         self.init_maze()
 
         # Variables
