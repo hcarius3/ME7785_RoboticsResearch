@@ -24,7 +24,7 @@ class ImageClassifier(Node):
         self.angle_num_samples = 20 # Number of samples in that range
         # Thresholds
         self.distance_threshold = 0.8
-        self.flatness_threshold = 0.08
+        self.flatness_threshold = 0.1
         self.perpendicular_angle_threshold = 20
         # Using the live yaw orientation
         self.yaw_tolerance = 20
